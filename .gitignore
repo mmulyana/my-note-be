@@ -1,0 +1,9 @@
+# Air live reload
+tmp/
+build-errors.log
+
+# Environment
+.env
+
+# Binary
+*.exe

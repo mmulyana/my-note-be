@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS todos;
+DROP TABLE IF EXISTS notes;
+DROP TYPE IF EXISTS todo_priority;

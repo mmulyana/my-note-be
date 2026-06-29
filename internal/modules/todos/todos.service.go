@@ -2,6 +2,9 @@ package todos
 
 import (
 	"encoding/json"
+	"fmt"
+	"html"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,12 +88,78 @@ func (s *Service) Update(id string, userID uuid.UUID, in TodoUpdateInput) (*Todo
 	if in.Priority != nil {
 		fields["priority"] = *in.Priority
 	}
-	if len(fields) > 0 {
-		if err := s.db.Model(t).Updates(fields).Error; err != nil {
-			return nil, err
+	if len(fields) == 0 {
+		return t, nil
+	}
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(t).Updates(fields).Error; err != nil {
+			return err
 		}
+
+		if in.Text != nil || in.Checked != nil {
+			var row struct {
+				Content string
+				Preview string
+			}
+			if err := tx.Table("notes").Select("content, preview").Where("id = ?", t.NoteID).Scan(&row).Error; err != nil {
+				return err
+			}
+
+			noteUpdates := map[string]any{
+				"content": patchNoteContent(row.Content, id, in.Checked, in.Text),
+				"preview": patchNoteContent(row.Preview, id, in.Checked, in.Text),
+			}
+			if in.Checked != nil {
+				noteUpdates["todo_done"] = gorm.Expr(
+					"(SELECT COUNT(*) FROM todos WHERE note_id = ? AND checked = true)", t.NoteID,
+				)
+			}
+			return tx.Table("notes").Where("id = ?", t.NoteID).Updates(noteUpdates).Error
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return t, nil
+}
+
+func patchNoteContent(content, todoID string, checked *bool, text *string) string {
+	pattern := fmt.Sprintf(`<li[^>]*\sdata-id="%s"[^>]*>.*?</li>`, regexp.QuoteMeta(todoID))
+	re := regexp.MustCompile(pattern)
+
+	return re.ReplaceAllStringFunc(content, func(liBlock string) string {
+		if checked != nil {
+			checkedVal := "false"
+			if *checked {
+				checkedVal = "true"
+			}
+			liBlock = regexp.MustCompile(`data-checked="[^"]*"`).
+				ReplaceAllString(liBlock, fmt.Sprintf(`data-checked="%s"`, checkedVal))
+
+			inputNew := `<input type="checkbox">`
+			if *checked {
+				inputNew = `<input type="checkbox" checked="checked">`
+			}
+			liBlock = regexp.MustCompile(`<input type="checkbox"[^>]*>`).
+				ReplaceAllString(liBlock, inputNew)
+		}
+
+		if text != nil {
+			textRe := regexp.MustCompile(`(<div><p>)(.*?)(</p></div>)`)
+			escaped := html.EscapeString(*text)
+			liBlock = textRe.ReplaceAllStringFunc(liBlock, func(match string) string {
+				subs := textRe.FindStringSubmatch(match)
+				if len(subs) < 4 {
+					return match
+				}
+				return subs[1] + escaped + subs[3]
+			})
+		}
+
+		return liBlock
+	})
 }
 
 func (s *Service) Remove(id string, userID uuid.UUID) error {

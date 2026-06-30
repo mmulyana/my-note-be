@@ -36,6 +36,7 @@ func Run() {
 
 	protected := api.Group("")
 	protected.Use(middleware.AuthMiddleware())
+	users.RegisterProtectedRoutes(protected, db)
 	notes.RegisterRoutes(protected, db)
 	folders.RegisterRoutes(protected, db)
 	categories.RegisterRoutes(protected, db)

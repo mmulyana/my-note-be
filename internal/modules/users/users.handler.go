@@ -40,6 +40,7 @@ func (h *Handler) Register(c *gin.Context) {
 	response.Created(c, "registered", TokenResponse{
 		AccessToken: token,
 		ExpiresAt:   expiresAt,
+		Email:       user.Email,
 	})
 }
 
@@ -65,5 +66,19 @@ func (h *Handler) Login(c *gin.Context) {
 	response.OK(c, "logged in", TokenResponse{
 		AccessToken: token,
 		ExpiresAt:   expiresAt,
+		Email:       user.Email,
+	})
+}
+
+func (h *Handler) Me(c *gin.Context) {
+	userID := c.GetString("user_id")
+	user, err := h.service.FindByID(userID)
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "user not found")
+		return
+	}
+	response.OK(c, "ok", ProfileResponse{
+		ID:    user.ID.String(),
+		Email: user.Email,
 	})
 }

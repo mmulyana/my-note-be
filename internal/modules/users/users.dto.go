@@ -13,4 +13,10 @@ type LoginInput struct {
 type TokenResponse struct {
 	AccessToken string `json:"accessToken"`
 	ExpiresAt   int64  `json:"expiresAt"`
+	Email       string `json:"email"`
+}
+
+type ProfileResponse struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
 }

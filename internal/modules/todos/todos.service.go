@@ -19,14 +19,41 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID) ([]Todo, error) {
-	var todos []Todo
-	err := s.db.
+func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit int) ([]Todo, int64, error) {
+	var total int64
+
+	q := s.db.Model(&Todo{}).
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ?", userID).
+		Where("notes.user_id = ?", userID)
+
+	if categoryID != nil {
+		q = q.Joins("JOIN note_categories nc ON nc.note_id = todos.note_id").
+			Where("nc.category_id = ?", *categoryID)
+	}
+
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+
+	var todos []Todo
+	dataQ := s.db.
+		Joins("JOIN notes ON notes.id = todos.note_id").
+		Where("notes.user_id = ?", userID)
+
+	if categoryID != nil {
+		dataQ = dataQ.Joins("JOIN note_categories nc ON nc.note_id = todos.note_id").
+			Where("nc.category_id = ?", *categoryID)
+	}
+
+	err := dataQ.
 		Order("todos.created_at DESC").
+		Offset(offset).
+		Limit(limit).
 		Find(&todos).Error
-	return todos, err
+
+	return todos, total, err
 }
 
 func (s *Service) FindOne(id string, userID uuid.UUID) (*Todo, error) {
@@ -63,10 +90,81 @@ func (s *Service) Create(userID uuid.UUID, in TodoInput) (*Todo, error) {
 		Priority: p,
 		Tags:     json.RawMessage(`[]`),
 	}
-	if err := s.db.Create(&t).Error; err != nil {
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&t).Error; err != nil {
+			return err
+		}
+
+		var row struct {
+			Content string
+			Preview string
+		}
+		if err := tx.Table("notes").Select("content, preview").Where("id = ?", in.NoteID).Scan(&row).Error; err != nil {
+			return err
+		}
+
+		liHTML := buildTodoLi(t.ID, in.Text, in.Checked, in.Deadline, p)
+
+		return tx.Table("notes").Where("id = ?", in.NoteID).Updates(map[string]any{
+			"content":    insertTodoLi(row.Content, in.LastTodoID, liHTML),
+			"preview":    insertTodoLi(row.Preview, in.LastTodoID, liHTML),
+			"todo_total": gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ?)", in.NoteID),
+			"todo_done":  gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ? AND checked = true)", in.NoteID),
+		}).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// buildTodoLi renders the taskItem <li> for a todo, matching the editor's
+// expected shape so the frontend can parse it back into a todo node.
+func buildTodoLi(id, text string, checked bool, deadline *string, priority Priority) string {
+	checkedAttr := "false"
+	inputCheckedAttr := ""
+	if checked {
+		checkedAttr = "true"
+		inputCheckedAttr = ` checked="checked"`
+	}
+	deadlineAttr := ""
+	if deadline != nil && *deadline != "" {
+		deadlineAttr = fmt.Sprintf(` data-deadline="%s"`, html.EscapeString(*deadline))
+	}
+	return fmt.Sprintf(
+		`<li data-checked="%s" data-id="%s"%s data-priority="%s" data-type="taskItem"><label><input type="checkbox"%s><span></span></label><div><p>%s</p></div></li>`,
+		checkedAttr,
+		html.EscapeString(id),
+		deadlineAttr,
+		html.EscapeString(string(priority)),
+		inputCheckedAttr,
+		html.EscapeString(text),
+	)
+}
+
+// insertTodoLi places liHTML into content without touching anything else.
+// Priority:
+//  1. If lastTodoID is given and found, insert directly after that <li>.
+//  2. Else append into the last existing <ul data-type="taskList">.
+//  3. Else create a new <ul data-type="taskList"> at the end of content.
+func insertTodoLi(content string, lastTodoID *string, liHTML string) string {
+	if lastTodoID != nil && *lastTodoID != "" {
+		pattern := fmt.Sprintf(`<li[^>]*\sdata-id="%s"[^>]*>.*?</li>`, regexp.QuoteMeta(*lastTodoID))
+		re := regexp.MustCompile(pattern)
+		if loc := re.FindStringIndex(content); loc != nil {
+			return content[:loc[1]] + liHTML + content[loc[1]:]
+		}
+	}
+
+	taskListRe := regexp.MustCompile(`<ul data-type="taskList"[^>]*>[\s\S]*?</ul>`)
+	if matches := taskListRe.FindAllStringIndex(content, -1); len(matches) > 0 {
+		last := matches[len(matches)-1]
+		closeIdx := last[1] - len("</ul>")
+		return content[:closeIdx] + liHTML + content[closeIdx:]
+	}
+
+	return content + `<ul data-type="taskList">` + liHTML + `</ul>`
 }
 
 func (s *Service) Update(id string, userID uuid.UUID, in TodoUpdateInput) (*Todo, error) {
@@ -163,16 +261,40 @@ func patchNoteContent(content, todoID string, checked *bool, text *string) strin
 }
 
 func (s *Service) Remove(id string, userID uuid.UUID) error {
-	res := s.db.
-		Where("id = ? AND note_id IN (SELECT id FROM notes WHERE user_id = ?)", id, userID).
-		Delete(&Todo{})
-	if res.Error != nil {
-		return res.Error
+	t, err := s.FindOne(id, userID)
+	if err != nil {
+		return err
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("id = ?", id).Delete(&Todo{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		var row struct {
+			Content string
+			Preview string
+		}
+		if err := tx.Table("notes").Select("content, preview").Where("id = ?", t.NoteID).Scan(&row).Error; err != nil {
+			return err
+		}
+
+		return tx.Table("notes").Where("id = ?", t.NoteID).Updates(map[string]any{
+			"content":    removeTodoFromContent(row.Content, id),
+			"preview":    removeTodoFromContent(row.Preview, id),
+			"todo_total": gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ?)", t.NoteID),
+			"todo_done":  gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ? AND checked = true)", t.NoteID),
+		}).Error
+	})
+}
+
+func removeTodoFromContent(content, todoID string) string {
+	pattern := fmt.Sprintf(`<li[^>]*\sdata-id="%s"[^>]*>.*?</li>`, regexp.QuoteMeta(todoID))
+	return regexp.MustCompile(pattern).ReplaceAllString(content, "")
 }
 
 func (s *Service) FindGroupByNotes(userID uuid.UUID) ([]NoteGroup, error) {

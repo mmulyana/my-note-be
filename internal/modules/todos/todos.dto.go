@@ -3,12 +3,13 @@ package todos
 import "time"
 
 type TodoInput struct {
-	ID       string   `json:"id" binding:"required"`
-	NoteID   string   `json:"noteId" binding:"required"`
-	Text     string   `json:"text"`
-	Checked  bool     `json:"checked"`
-	Deadline *string  `json:"deadline"`
-	Priority Priority `json:"priority"`
+	ID         string   `json:"id" binding:"required"`
+	NoteID     string   `json:"noteId" binding:"required"`
+	Text       string   `json:"text"`
+	Checked    bool     `json:"checked"`
+	Deadline   *string  `json:"deadline"`
+	Priority   Priority `json:"priority"`
+	LastTodoID *string  `json:"lastTodoId"`
 }
 
 type TodoUpdateInput struct {

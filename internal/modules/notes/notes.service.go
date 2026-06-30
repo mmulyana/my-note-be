@@ -22,15 +22,40 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID) ([]Note, error) {
+func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit int) ([]Note, int64, error) {
+	var total int64
+
+	q := s.db.Model(&Note{}).Where("notes.user_id = ? AND notes.archived = false", userID)
+
+	if categoryID != nil {
+		q = q.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
+			Where("nc.category_id = ?", *categoryID)
+	}
+
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+
 	var notes []Note
 	err := s.db.
-		Select("id, title, preview, todo_total, todo_done, updated_at").
+		Select("notes.id, notes.title, notes.preview, notes.todo_total, notes.todo_done, notes.updated_at").
 		Preload("Categories").
-		Where("user_id = ? AND archived = false", userID).
-		Order("updated_at DESC").
+		Where("notes.user_id = ? AND notes.archived = false", userID).
+		Scopes(func(db *gorm.DB) *gorm.DB {
+			if categoryID != nil {
+				return db.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
+					Where("nc.category_id = ?", *categoryID)
+			}
+			return db
+		}).
+		Order("notes.updated_at DESC").
+		Offset(offset).
+		Limit(limit).
 		Find(&notes).Error
-	return notes, err
+
+	return notes, total, err
 }
 
 func (s *Service) FindOne(id string, userID uuid.UUID) (*Note, error) {

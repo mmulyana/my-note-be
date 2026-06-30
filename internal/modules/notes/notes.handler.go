@@ -3,11 +3,13 @@ package notes
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"my-note-be/internal/helpers"
 	"my-note-be/internal/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -25,12 +27,39 @@ func (h *Handler) FindAll(c *gin.Context) {
 		return
 	}
 
-	notes, err := h.service.FindAll(uid)
+	var categoryID *uuid.UUID
+	if raw := c.Query("categoryId"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid categoryId")
+			return
+		}
+		categoryID = &id
+	}
+
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			limit = v
+			if limit > 100 {
+				limit = 100
+			}
+		}
+	}
+
+	notes, total, err := h.service.FindAll(uid, categoryID, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response.OK(c, "ok", ToListItemResponses(notes))
+	response.OKPaginated(c, "ok", ToListItemResponses(notes), page, limit, total)
 }
 
 func (h *Handler) FindOne(c *gin.Context) {

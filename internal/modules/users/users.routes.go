@@ -14,3 +14,8 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 		g.POST("/login", h.Login)
 	}
 }
+
+func RegisterProtectedRoutes(r *gin.RouterGroup, db *gorm.DB) {
+	h := NewHandler(db)
+	r.GET("/me", h.Me)
+}

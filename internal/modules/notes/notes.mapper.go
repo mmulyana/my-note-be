@@ -3,6 +3,8 @@ package notes
 import (
 	"time"
 
+	"my-note-be/internal/modules/folders"
+
 	"github.com/google/uuid"
 )
 
@@ -11,12 +13,26 @@ type CategoryResponse struct {
 	Name string    `json:"name"`
 }
 
+type FolderResponse struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Color string    `json:"color"`
+}
+
+func toFolderResponse(f *folders.Folder) *FolderResponse {
+	if f == nil {
+		return nil
+	}
+	return &FolderResponse{ID: f.ID, Name: f.Name, Color: f.Color}
+}
+
 type NoteListItemResponse struct {
 	ID          string             `json:"id"`
 	Title       string             `json:"title"`
 	Preview     string             `json:"preview"`
 	TodoSummary TodoSummary        `json:"todoSummary"`
 	Categories  []CategoryResponse `json:"categories"`
+	Folder      *FolderResponse    `json:"folder"`
 	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
@@ -39,6 +55,7 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 			Done:  n.TodoDone,
 		},
 		Categories: cats,
+		Folder:     toFolderResponse(n.Folder),
 		UpdatedAt:  n.UpdatedAt,
 	}
 }
@@ -56,6 +73,7 @@ type NoteDetailResponse struct {
 	Title      string             `json:"title"`
 	Content    string             `json:"content"`
 	FolderID   *uuid.UUID         `json:"folderId"`
+	Folder     *FolderResponse    `json:"folder"`
 	Todos      []TodoResponse     `json:"todos"`
 	Categories []CategoryResponse `json:"categories"`
 	CreatedAt  time.Time          `json:"createdAt"`
@@ -84,6 +102,7 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 		Title:      n.Title,
 		Content:    n.Content,
 		FolderID:   n.FolderID,
+		Folder:     toFolderResponse(n.Folder),
 		Todos:      todos,
 		Categories: cats,
 		CreatedAt:  n.CreatedAt,

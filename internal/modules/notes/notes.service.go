@@ -22,15 +22,29 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, folderID *uuid.UUID, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
-	q := s.db.Model(&Note{}).Where("notes.user_id = ? AND notes.archived = false", userID)
+	search = strings.TrimSpace(search)
 
-	if categoryID != nil {
-		q = q.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
-			Where("nc.category_id = ?", *categoryID)
+	filters := func(db *gorm.DB) *gorm.DB {
+		if categoryID != nil {
+			db = db.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
+				Where("nc.category_id = ?", *categoryID)
+		}
+		if folderID != nil {
+			db = db.Where("notes.folder_id = ?", *folderID)
+		}
+		if search != "" {
+			pattern := "%" + search + "%"
+			db = db.Where("notes.title ILIKE ? OR notes.text ILIKE ?", pattern, pattern)
+		}
+		return db
 	}
+
+	q := s.db.Model(&Note{}).
+		Where("notes.user_id = ? AND notes.archived = false", userID).
+		Scopes(filters)
 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -40,16 +54,11 @@ func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit i
 
 	var notes []Note
 	err := s.db.
-		Select("notes.id, notes.title, notes.preview, notes.todo_total, notes.todo_done, notes.updated_at").
+		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.todo_total, notes.todo_done, notes.updated_at").
 		Preload("Categories").
+		Preload("Folder").
 		Where("notes.user_id = ? AND notes.archived = false", userID).
-		Scopes(func(db *gorm.DB) *gorm.DB {
-			if categoryID != nil {
-				return db.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
-					Where("nc.category_id = ?", *categoryID)
-			}
-			return db
-		}).
+		Scopes(filters).
 		Order("notes.updated_at DESC").
 		Offset(offset).
 		Limit(limit).
@@ -63,6 +72,7 @@ func (s *Service) FindOne(id string, userID uuid.UUID) (*Note, error) {
 	if err := s.db.
 		Preload("Todos").
 		Preload("Categories").
+		Preload("Folder").
 		First(&note, "id = ? AND user_id = ?", id, userID).Error; err != nil {
 		return nil, err
 	}

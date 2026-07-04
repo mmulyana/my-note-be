@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"my-note-be/internal/modules/categories"
+	"my-note-be/internal/modules/folders"
 
 	"github.com/google/uuid"
 )
@@ -33,6 +34,7 @@ type Note struct {
 
 	Todos      []Todo                `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
 	Categories []categories.Category `gorm:"many2many:note_categories;" json:"-"`
+	Folder     *folders.Folder       `gorm:"foreignKey:FolderID;references:ID" json:"-"`
 }
 
 type Todo struct {

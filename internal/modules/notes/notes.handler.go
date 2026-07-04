@@ -37,6 +37,16 @@ func (h *Handler) FindAll(c *gin.Context) {
 		categoryID = &id
 	}
 
+	var folderID *uuid.UUID
+	if raw := c.Query("folderId"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid folderId")
+			return
+		}
+		folderID = &id
+	}
+
 	page := 1
 	if raw := c.Query("page"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
@@ -54,7 +64,9 @@ func (h *Handler) FindAll(c *gin.Context) {
 		}
 	}
 
-	notes, total, err := h.service.FindAll(uid, categoryID, page, limit)
+	search := c.Query("q")
+
+	notes, total, err := h.service.FindAll(uid, categoryID, folderID, search, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

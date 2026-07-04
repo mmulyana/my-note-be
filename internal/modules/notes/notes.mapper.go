@@ -33,6 +33,9 @@ type NoteListItemResponse struct {
 	TodoSummary TodoSummary     `json:"todoSummary"`
 	Labels      []LabelResponse `json:"labels"`
 	Folder      *FolderResponse `json:"folder"`
+	Pinned      bool            `json:"pinned"`
+	Secret      bool            `json:"secret"`
+	Archived    bool            `json:"archived"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
@@ -56,6 +59,9 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 		},
 		Labels:    lbls,
 		Folder:    toFolderResponse(n.Folder),
+		Pinned:    n.Pinned,
+		Secret:    n.Secret,
+		Archived:  n.Archived,
 		UpdatedAt: n.UpdatedAt,
 	}
 }
@@ -76,6 +82,9 @@ type NoteDetailResponse struct {
 	Folder    *FolderResponse `json:"folder"`
 	Todos     []TodoResponse  `json:"todos"`
 	Labels    []LabelResponse `json:"labels"`
+	Pinned    bool            `json:"pinned"`
+	Secret    bool            `json:"secret"`
+	Archived  bool            `json:"archived"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
@@ -85,6 +94,7 @@ type TodoResponse struct {
 	Checked  bool         `json:"checked"`
 	Text     string       `json:"text"`
 	Deadline *string      `json:"deadline"`
+	Today    *string      `json:"today"`
 	Priority TodoPriority `json:"priority"`
 }
 
@@ -105,6 +115,9 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 		Folder:    toFolderResponse(n.Folder),
 		Todos:     todos,
 		Labels:    lbls,
+		Pinned:    n.Pinned,
+		Secret:    n.Secret,
+		Archived:  n.Archived,
 		CreatedAt: n.CreatedAt,
 		UpdatedAt: n.UpdatedAt,
 	}
@@ -120,6 +133,10 @@ func toTodoResponse(t Todo) TodoResponse {
 	if t.Deadline != nil {
 		d := t.Deadline.Format("2006-01-02")
 		res.Deadline = &d
+	}
+	if t.Today != nil {
+		d := t.Today.Format("2006-01-02")
+		res.Today = &d
 	}
 	return res
 }

@@ -14,6 +14,10 @@ func ToResponse(t Todo) TodoResponse {
 		d := t.Deadline.Format("2006-01-02")
 		res.Deadline = &d
 	}
+	if t.Today != nil {
+		d := t.Today.Format("2006-01-02")
+		res.Today = &d
+	}
 	return res
 }
 

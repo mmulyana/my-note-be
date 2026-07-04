@@ -47,6 +47,20 @@ func (h *Handler) FindAll(c *gin.Context) {
 		folderID = &id
 	}
 
+	var archived *bool
+	if raw := c.Query("archived"); raw != "" {
+		if v, err := strconv.ParseBool(raw); err == nil {
+			archived = &v
+		}
+	}
+
+	var pinned *bool
+	if raw := c.Query("pinned"); raw != "" {
+		if v, err := strconv.ParseBool(raw); err == nil {
+			pinned = &v
+		}
+	}
+
 	page := 1
 	if raw := c.Query("page"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
@@ -66,7 +80,7 @@ func (h *Handler) FindAll(c *gin.Context) {
 
 	search := c.Query("q")
 
-	notes, total, err := h.service.FindAll(uid, labelID, folderID, search, page, limit)
+	notes, total, err := h.service.FindAll(uid, labelID, folderID, archived, pinned, search, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

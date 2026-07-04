@@ -22,7 +22,7 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, search string, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, archived *bool, pinned *bool, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
 	search = strings.TrimSpace(search)
@@ -35,6 +35,14 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		if folderID != nil {
 			db = db.Where("notes.folder_id = ?", *folderID)
 		}
+		if archived != nil {
+			db = db.Where("notes.archived = ?", *archived)
+		} else {
+			db = db.Where("notes.archived = false")
+		}
+		if pinned != nil {
+			db = db.Where("notes.pinned = ?", *pinned)
+		}
 		if search != "" {
 			pattern := "%" + search + "%"
 			db = db.Where("notes.title ILIKE ? OR notes.text ILIKE ?", pattern, pattern)
@@ -43,7 +51,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 	}
 
 	q := s.db.Model(&Note{}).
-		Where("notes.user_id = ? AND notes.archived = false", userID).
+		Where("notes.user_id = ?", userID).
 		Scopes(filters)
 
 	if err := q.Count(&total).Error; err != nil {
@@ -54,10 +62,10 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 
 	var notes []Note
 	err := s.db.
-		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.todo_total, notes.todo_done, notes.updated_at").
+		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at").
 		Preload("Labels").
 		Preload("Folder").
-		Where("notes.user_id = ? AND notes.archived = false", userID).
+		Where("notes.user_id = ?", userID).
 		Scopes(filters).
 		Order("notes.updated_at DESC").
 		Offset(offset).
@@ -117,13 +125,14 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 				NoteID:   note.ID,
 				Text:     a.Text,
 				Checked:  a.Checked,
-				Deadline: parseDeadline(a.Deadline),
+				Deadline: parseDate(a.Deadline),
+				Today:    parseDate(a.Today),
 				Priority: p,
 				Tags:     json.RawMessage(`[]`),
 			}
 			if err := tx.Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "id"}},
-				DoUpdates: clause.AssignmentColumns([]string{"text", "checked", "deadline", "priority", "updated_at"}),
+				DoUpdates: clause.AssignmentColumns([]string{"text", "checked", "deadline", "today", "priority", "updated_at"}),
 			}).Create(&todo).Error; err != nil {
 				return err
 			}
@@ -160,13 +169,23 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			return err
 		}
 
-		if err := tx.Model(&Note{}).Where("id = ?", id).Updates(map[string]any{
+		noteUpdates := map[string]any{
 			"content":   in.Content,
 			"preview":   in.Preview,
 			"title":     extractTitle(in.Content),
 			"text":      tagRe.ReplaceAllString(in.Preview, ""),
 			"folder_id": in.FolderID,
-		}).Error; err != nil {
+		}
+		if in.Pinned != nil {
+			noteUpdates["pinned"] = *in.Pinned
+		}
+		if in.Archived != nil {
+			noteUpdates["archived"] = *in.Archived
+		}
+		if in.Secret != nil {
+			noteUpdates["secret"] = *in.Secret
+		}
+		if err := tx.Model(&Note{}).Where("id = ?", id).Updates(noteUpdates).Error; err != nil {
 			return err
 		}
 
@@ -197,13 +216,14 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 				NoteID:   id,
 				Text:     a.Text,
 				Checked:  a.Checked,
-				Deadline: parseDeadline(a.Deadline),
+				Deadline: parseDate(a.Deadline),
+				Today:    parseDate(a.Today),
 				Priority: p,
 				Tags:     json.RawMessage(`[]`),
 			}
 			if err := tx.Clauses(clause.OnConflict{
 				Columns:   []clause.Column{{Name: "id"}},
-				DoUpdates: clause.AssignmentColumns([]string{"text", "checked", "deadline", "priority", "updated_at"}),
+				DoUpdates: clause.AssignmentColumns([]string{"text", "checked", "deadline", "today", "priority", "updated_at"}),
 			}).Create(&todo).Error; err != nil {
 				return err
 			}
@@ -271,6 +291,18 @@ func buildUpdateMap(fields map[string]json.RawMessage) map[string]any {
 			}
 		}
 	}
+	if raw, ok := fields["today"]; ok {
+		if string(raw) == "null" {
+			out["today"] = nil
+		} else {
+			var ds string
+			if json.Unmarshal(raw, &ds) == nil {
+				if t, err := time.Parse("2006-01-02", ds); err == nil {
+					out["today"] = t
+				}
+			}
+		}
+	}
 	if raw, ok := fields["priority"]; ok {
 		var v string
 		if json.Unmarshal(raw, &v) == nil {
@@ -281,7 +313,7 @@ func buildUpdateMap(fields map[string]json.RawMessage) map[string]any {
 	return out
 }
 
-func parseDeadline(s *string) *time.Time {
+func parseDate(s *string) *time.Time {
 	if s == nil || *s == "" {
 		return nil
 	}

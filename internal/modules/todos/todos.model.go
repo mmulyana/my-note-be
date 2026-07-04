@@ -19,6 +19,7 @@ type Todo struct {
 	Text      string          `gorm:"type:text;not null;default:''" json:"text"`
 	Checked   bool            `gorm:"not null;default:false" json:"checked"`
 	Deadline  *time.Time      `gorm:"type:date" json:"-"`
+	Today     *time.Time      `gorm:"type:date" json:"-"`
 	Priority  Priority        `gorm:"type:text;not null;default:'medium'" json:"priority"`
 	Tags      json.RawMessage `gorm:"type:jsonb;not null;default:'[]'" json:"-"`
 	CreatedAt time.Time       `json:"createdAt"`

@@ -29,6 +29,8 @@ type Note struct {
 	TodoTotal int        `gorm:"column:todo_total;not null;default:0" json:"todoTotal"`
 	TodoDone  int        `gorm:"column:todo_done;not null;default:0" json:"todoDone"`
 	Archived  bool       `gorm:"not null;default:false" json:"archived"`
+	Pinned    bool       `gorm:"not null;default:false" json:"pinned"`
+	Secret    bool       `gorm:"not null;default:false" json:"secret"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 
@@ -43,6 +45,7 @@ type Todo struct {
 	Text      string          `gorm:"type:text;not null;default:''" json:"text"`
 	Checked   bool            `gorm:"not null;default:false" json:"checked"`
 	Deadline  *time.Time      `gorm:"type:date" json:"-"`
+	Today     *time.Time      `gorm:"type:date" json:"-"`
 	Priority  TodoPriority    `gorm:"type:text;not null;default:'medium'" json:"priority"`
 	Tags      json.RawMessage `gorm:"type:jsonb;not null;default:'[]'" json:"-"`
 	CreatedAt time.Time       `json:"createdAt"`

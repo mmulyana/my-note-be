@@ -86,7 +86,8 @@ func (s *Service) Create(userID uuid.UUID, in TodoInput) (*Todo, error) {
 		NoteID:   in.NoteID,
 		Text:     in.Text,
 		Checked:  in.Checked,
-		Deadline: parseDeadline(in.Deadline),
+		Deadline: parseDate(in.Deadline),
+		Today:    parseDate(in.Today),
 		Priority: p,
 		Tags:     json.RawMessage(`[]`),
 	}
@@ -181,7 +182,10 @@ func (s *Service) Update(id string, userID uuid.UUID, in TodoUpdateInput) (*Todo
 		fields["checked"] = *in.Checked
 	}
 	if in.Deadline != nil {
-		fields["deadline"] = parseDeadline(in.Deadline)
+		fields["deadline"] = parseDate(in.Deadline)
+	}
+	if in.Today != nil {
+		fields["today"] = parseDate(in.Today)
 	}
 	if in.Priority != nil {
 		fields["priority"] = *in.Priority
@@ -364,7 +368,7 @@ func (s *Service) FindGroupByDeadline(userID uuid.UUID) ([]DeadlineGroup, error)
 	return out, nil
 }
 
-func parseDeadline(s *string) *time.Time {
+func parseDate(s *string) *time.Time {
 	if s == nil || *s == "" {
 		return nil
 	}

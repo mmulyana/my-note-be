@@ -20,6 +20,9 @@ type SaveNoteInput struct {
 	TodoDiff TodoDiff    `json:"todoDiff"`
 	LabelIDs []uuid.UUID `json:"labelIds"`
 	FolderID *uuid.UUID  `json:"folderId"`
+	Pinned   *bool       `json:"pinned"`
+	Archived *bool       `json:"archived"`
+	Secret   *bool       `json:"secret"`
 }
 
 type TodoDiff struct {
@@ -33,6 +36,7 @@ type TodoInput struct {
 	Checked  bool         `json:"checked"`
 	Text     string       `json:"text"`
 	Deadline *string      `json:"deadline"`
+	Today    *string      `json:"today"`
 	Priority TodoPriority `json:"priority"`
 }
 

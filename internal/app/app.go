@@ -4,8 +4,8 @@ import (
 	"my-note-be/internal/config"
 	"my-note-be/internal/database"
 	"my-note-be/internal/middleware"
-	"my-note-be/internal/modules/categories"
 	"my-note-be/internal/modules/folders"
+	"my-note-be/internal/modules/labels"
 	"my-note-be/internal/modules/notes"
 	"my-note-be/internal/modules/todos"
 	"my-note-be/internal/modules/users"
@@ -39,7 +39,7 @@ func Run() {
 	users.RegisterProtectedRoutes(protected, db)
 	notes.RegisterRoutes(protected, db)
 	folders.RegisterRoutes(protected, db)
-	categories.RegisterRoutes(protected, db)
+	labels.RegisterRoutes(protected, db)
 	todos.RegisterRoutes(protected, db)
 
 	r.Run(":" + cfg.Port)

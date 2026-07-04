@@ -1,9 +1,14 @@
 package folders
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// ErrDuplicateName is returned when a folder name already exists for the user.
+var ErrDuplicateName = errors.New("folder already exists")
 
 type Service struct {
 	db *gorm.DB
@@ -30,6 +35,9 @@ func (s *Service) FindOne(id uuid.UUID, userID uuid.UUID) (*Folder, error) {
 func (s *Service) Create(userID uuid.UUID, in FolderInput) (*Folder, error) {
 	f := in.ToModel(userID)
 	if err := s.db.Create(&f).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrDuplicateName
+		}
 		return nil, err
 	}
 	return &f, nil
@@ -48,6 +56,9 @@ func (s *Service) Update(id uuid.UUID, userID uuid.UUID, in FolderInput) (*Folde
 		"name":  in.Name,
 		"color": color,
 	}).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrDuplicateName
+		}
 		return nil, err
 	}
 	return &f, nil

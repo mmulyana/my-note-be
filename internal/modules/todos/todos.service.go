@@ -19,16 +19,16 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit int) ([]Todo, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, page, limit int) ([]Todo, int64, error) {
 	var total int64
 
 	q := s.db.Model(&Todo{}).
 		Joins("JOIN notes ON notes.id = todos.note_id").
 		Where("notes.user_id = ?", userID)
 
-	if categoryID != nil {
-		q = q.Joins("JOIN note_categories nc ON nc.note_id = todos.note_id").
-			Where("nc.category_id = ?", *categoryID)
+	if labelID != nil {
+		q = q.Joins("JOIN note_labels nl ON nl.note_id = todos.note_id").
+			Where("nl.label_id = ?", *labelID)
 	}
 
 	if err := q.Count(&total).Error; err != nil {
@@ -42,9 +42,9 @@ func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, page, limit i
 		Joins("JOIN notes ON notes.id = todos.note_id").
 		Where("notes.user_id = ?", userID)
 
-	if categoryID != nil {
-		dataQ = dataQ.Joins("JOIN note_categories nc ON nc.note_id = todos.note_id").
-			Where("nc.category_id = ?", *categoryID)
+	if labelID != nil {
+		dataQ = dataQ.Joins("JOIN note_labels nl ON nl.note_id = todos.note_id").
+			Where("nl.label_id = ?", *labelID)
 	}
 
 	err := dataQ.

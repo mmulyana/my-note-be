@@ -62,7 +62,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	f, err := h.service.Create(uid, in)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		respondLookupError(c, err)
 		return
 	}
 	response.Created(c, "created", ToResponse(*f))
@@ -116,9 +116,12 @@ func parseID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 func respondLookupError(c *gin.Context, err error) {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
 		response.Error(c, http.StatusNotFound, "folder not found")
-		return
+	case errors.Is(err, ErrDuplicateName):
+		response.Error(c, http.StatusConflict, err.Error())
+	default:
+		response.Error(c, http.StatusInternalServerError, err.Error())
 	}
-	response.Error(c, http.StatusInternalServerError, err.Error())
 }

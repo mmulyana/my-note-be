@@ -1,10 +1,10 @@
-package categories
+package labels
 
-type CategoryInput struct {
+type LabelInput struct {
 	Name string `json:"name" binding:"required"`
 }
 
-type CategoryResponse struct {
+type LabelResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }

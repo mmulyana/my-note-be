@@ -1,4 +1,4 @@
-package categories
+package labels
 
 import (
 	"github.com/gin-gonic/gin"
@@ -8,7 +8,7 @@ import (
 func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	h := NewHandler(db)
 
-	g := r.Group("/categories")
+	g := r.Group("/labels")
 	{
 		g.GET("", h.FindAll)
 		g.GET("/:id", h.FindOne)

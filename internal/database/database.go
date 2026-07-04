@@ -13,7 +13,9 @@ import (
 var DB *gorm.DB
 
 func Connect(dsn string) *gorm.DB {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		TranslateError: true,
+	})
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}

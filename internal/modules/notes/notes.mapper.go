@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type CategoryResponse struct {
+type LabelResponse struct {
 	ID   uuid.UUID `json:"id"`
 	Name string    `json:"name"`
 }
@@ -27,13 +27,13 @@ func toFolderResponse(f *folders.Folder) *FolderResponse {
 }
 
 type NoteListItemResponse struct {
-	ID          string             `json:"id"`
-	Title       string             `json:"title"`
-	Preview     string             `json:"preview"`
-	TodoSummary TodoSummary        `json:"todoSummary"`
-	Categories  []CategoryResponse `json:"categories"`
-	Folder      *FolderResponse    `json:"folder"`
-	UpdatedAt   time.Time          `json:"updatedAt"`
+	ID          string          `json:"id"`
+	Title       string          `json:"title"`
+	Preview     string          `json:"preview"`
+	TodoSummary TodoSummary     `json:"todoSummary"`
+	Labels      []LabelResponse `json:"labels"`
+	Folder      *FolderResponse `json:"folder"`
+	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
 type TodoSummary struct {
@@ -42,9 +42,9 @@ type TodoSummary struct {
 }
 
 func ToListItemResponse(n Note) NoteListItemResponse {
-	cats := make([]CategoryResponse, len(n.Categories))
-	for i, c := range n.Categories {
-		cats[i] = CategoryResponse{ID: c.ID, Name: c.Name}
+	lbls := make([]LabelResponse, len(n.Labels))
+	for i, l := range n.Labels {
+		lbls[i] = LabelResponse{ID: l.ID, Name: l.Name}
 	}
 	return NoteListItemResponse{
 		ID:      n.ID,
@@ -54,9 +54,9 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 			Total: n.TodoTotal,
 			Done:  n.TodoDone,
 		},
-		Categories: cats,
-		Folder:     toFolderResponse(n.Folder),
-		UpdatedAt:  n.UpdatedAt,
+		Labels:    lbls,
+		Folder:    toFolderResponse(n.Folder),
+		UpdatedAt: n.UpdatedAt,
 	}
 }
 
@@ -69,15 +69,15 @@ func ToListItemResponses(notes []Note) []NoteListItemResponse {
 }
 
 type NoteDetailResponse struct {
-	ID         string             `json:"id"`
-	Title      string             `json:"title"`
-	Content    string             `json:"content"`
-	FolderID   *uuid.UUID         `json:"folderId"`
-	Folder     *FolderResponse    `json:"folder"`
-	Todos      []TodoResponse     `json:"todos"`
-	Categories []CategoryResponse `json:"categories"`
-	CreatedAt  time.Time          `json:"createdAt"`
-	UpdatedAt  time.Time          `json:"updatedAt"`
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Content   string          `json:"content"`
+	FolderID  *uuid.UUID      `json:"folderId"`
+	Folder    *FolderResponse `json:"folder"`
+	Todos     []TodoResponse  `json:"todos"`
+	Labels    []LabelResponse `json:"labels"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
 type TodoResponse struct {
@@ -93,20 +93,20 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 	for i, t := range n.Todos {
 		todos[i] = toTodoResponse(t)
 	}
-	cats := make([]CategoryResponse, len(n.Categories))
-	for i, c := range n.Categories {
-		cats[i] = CategoryResponse{ID: c.ID, Name: c.Name}
+	lbls := make([]LabelResponse, len(n.Labels))
+	for i, l := range n.Labels {
+		lbls[i] = LabelResponse{ID: l.ID, Name: l.Name}
 	}
 	return NoteDetailResponse{
-		ID:         n.ID,
-		Title:      n.Title,
-		Content:    n.Content,
-		FolderID:   n.FolderID,
-		Folder:     toFolderResponse(n.Folder),
-		Todos:      todos,
-		Categories: cats,
-		CreatedAt:  n.CreatedAt,
-		UpdatedAt:  n.UpdatedAt,
+		ID:        n.ID,
+		Title:     n.Title,
+		Content:   n.Content,
+		FolderID:  n.FolderID,
+		Folder:    toFolderResponse(n.Folder),
+		Todos:     todos,
+		Labels:    lbls,
+		CreatedAt: n.CreatedAt,
+		UpdatedAt: n.UpdatedAt,
 	}
 }
 

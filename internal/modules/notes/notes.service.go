@@ -22,15 +22,15 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, folderID *uuid.UUID, search string, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
 	search = strings.TrimSpace(search)
 
 	filters := func(db *gorm.DB) *gorm.DB {
-		if categoryID != nil {
-			db = db.Joins("JOIN note_categories nc ON nc.note_id = notes.id").
-				Where("nc.category_id = ?", *categoryID)
+		if labelID != nil {
+			db = db.Joins("JOIN note_labels nl ON nl.note_id = notes.id").
+				Where("nl.label_id = ?", *labelID)
 		}
 		if folderID != nil {
 			db = db.Where("notes.folder_id = ?", *folderID)
@@ -55,7 +55,7 @@ func (s *Service) FindAll(userID uuid.UUID, categoryID *uuid.UUID, folderID *uui
 	var notes []Note
 	err := s.db.
 		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.todo_total, notes.todo_done, notes.updated_at").
-		Preload("Categories").
+		Preload("Labels").
 		Preload("Folder").
 		Where("notes.user_id = ? AND notes.archived = false", userID).
 		Scopes(filters).
@@ -71,7 +71,7 @@ func (s *Service) FindOne(id string, userID uuid.UUID) (*Note, error) {
 	var note Note
 	if err := s.db.
 		Preload("Todos").
-		Preload("Categories").
+		Preload("Labels").
 		Preload("Folder").
 		First(&note, "id = ? AND user_id = ?", id, userID).Error; err != nil {
 		return nil, err
@@ -93,8 +93,8 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 			return err
 		}
 
-		for _, catID := range in.CategoryIDs {
-			if err := tx.Exec("INSERT INTO note_categories (note_id, category_id) VALUES (?, ?)", note.ID, catID).Error; err != nil {
+		for _, labelID := range in.LabelIDs {
+			if err := tx.Exec("INSERT INTO note_labels (note_id, label_id) VALUES (?, ?)", note.ID, labelID).Error; err != nil {
 				return err
 			}
 		}
@@ -170,11 +170,11 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			return err
 		}
 
-		if err := tx.Exec("DELETE FROM note_categories WHERE note_id = ?", id).Error; err != nil {
+		if err := tx.Exec("DELETE FROM note_labels WHERE note_id = ?", id).Error; err != nil {
 			return err
 		}
-		for _, catID := range in.CategoryIDs {
-			if err := tx.Exec("INSERT INTO note_categories (note_id, category_id) VALUES (?, ?)", id, catID).Error; err != nil {
+		for _, labelID := range in.LabelIDs {
+			if err := tx.Exec("INSERT INTO note_labels (note_id, label_id) VALUES (?, ?)", id, labelID).Error; err != nil {
 				return err
 			}
 		}

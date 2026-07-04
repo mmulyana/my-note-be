@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"my-note-be/internal/modules/categories"
 	"my-note-be/internal/modules/folders"
+	"my-note-be/internal/modules/labels"
 
 	"github.com/google/uuid"
 )
@@ -22,19 +22,19 @@ type Note struct {
 	ID        string     `gorm:"type:text;primaryKey" json:"id"`
 	UserID    uuid.UUID  `gorm:"type:uuid;not null" json:"userId"`
 	FolderID  *uuid.UUID `gorm:"type:uuid;null" json:"folderId"`
-	Title     string    `gorm:"size:200;not null;default:''" json:"title"`
-	Preview   string    `gorm:"type:text;not null;default:''" json:"preview"`
-	Text      string    `gorm:"type:text;not null;default:''" json:"-"`
-	Content   string    `gorm:"type:text;not null;default:''" json:"content"`
-	TodoTotal int       `gorm:"column:todo_total;not null;default:0" json:"todoTotal"`
-	TodoDone  int       `gorm:"column:todo_done;not null;default:0" json:"todoDone"`
-	Archived  bool      `gorm:"not null;default:false" json:"archived"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Title     string     `gorm:"size:200;not null;default:''" json:"title"`
+	Preview   string     `gorm:"type:text;not null;default:''" json:"preview"`
+	Text      string     `gorm:"type:text;not null;default:''" json:"-"`
+	Content   string     `gorm:"type:text;not null;default:''" json:"content"`
+	TodoTotal int        `gorm:"column:todo_total;not null;default:0" json:"todoTotal"`
+	TodoDone  int        `gorm:"column:todo_done;not null;default:0" json:"todoDone"`
+	Archived  bool       `gorm:"not null;default:false" json:"archived"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 
-	Todos      []Todo                `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
-	Categories []categories.Category `gorm:"many2many:note_categories;" json:"-"`
-	Folder     *folders.Folder       `gorm:"foreignKey:FolderID;references:ID" json:"-"`
+	Todos  []Todo          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
+	Labels []labels.Label  `gorm:"many2many:note_labels;" json:"-"`
+	Folder *folders.Folder `gorm:"foreignKey:FolderID;references:ID" json:"-"`
 }
 
 type Todo struct {

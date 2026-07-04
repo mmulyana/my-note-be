@@ -7,25 +7,25 @@ import (
 )
 
 type CreateNoteInput struct {
-	ID          string      `json:"id" binding:"required"`
-	Content     string      `json:"content"`
-	TodoDiff    TodoDiff    `json:"todoDiff"`
-	CategoryIDs []uuid.UUID `json:"categoryIds"`
-	FolderID    *uuid.UUID  `json:"folderId"`
+	ID       string      `json:"id" binding:"required"`
+	Content  string      `json:"content"`
+	TodoDiff TodoDiff    `json:"todoDiff"`
+	LabelIDs []uuid.UUID `json:"labelIds"`
+	FolderID *uuid.UUID  `json:"folderId"`
 }
 
 type SaveNoteInput struct {
-	Content     string      `json:"content" binding:"required"`
-	Preview     string      `json:"preview"`
-	TodoDiff    TodoDiff    `json:"todoDiff"`
-	CategoryIDs []uuid.UUID `json:"categoryIds"`
-	FolderID    *uuid.UUID  `json:"folderId"`
+	Content  string      `json:"content" binding:"required"`
+	Preview  string      `json:"preview"`
+	TodoDiff TodoDiff    `json:"todoDiff"`
+	LabelIDs []uuid.UUID `json:"labelIds"`
+	FolderID *uuid.UUID  `json:"folderId"`
 }
 
 type TodoDiff struct {
-	Added   []TodoInput   `json:"added"`
-	Updated []TodoUpdate  `json:"updated"`
-	Removed []string      `json:"removed"`
+	Added   []TodoInput  `json:"added"`
+	Updated []TodoUpdate `json:"updated"`
+	Removed []string     `json:"removed"`
 }
 
 type TodoInput struct {

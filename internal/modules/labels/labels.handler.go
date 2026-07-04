@@ -1,4 +1,4 @@
-package categories
+package labels
 
 import (
 	"errors"
@@ -26,12 +26,12 @@ func (h *Handler) FindAll(c *gin.Context) {
 		return
 	}
 
-	cats, err := h.service.FindAll(uid)
+	labels, err := h.service.FindAll(uid)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response.OK(c, "ok", ToResponses(cats))
+	response.OK(c, "ok", ToResponses(labels))
 }
 
 func (h *Handler) FindOne(c *gin.Context) {
@@ -44,16 +44,16 @@ func (h *Handler) FindOne(c *gin.Context) {
 		return
 	}
 
-	cat, err := h.service.FindOne(id, uid)
+	label, err := h.service.FindOne(id, uid)
 	if err != nil {
 		respondLookupError(c, err)
 		return
 	}
-	response.OK(c, "ok", ToResponse(*cat))
+	response.OK(c, "ok", ToResponse(*label))
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	var in CategoryInput
+	var in LabelInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -63,12 +63,12 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	cat, err := h.service.Create(uid, in)
+	label, err := h.service.Create(uid, in)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		respondLookupError(c, err)
 		return
 	}
-	response.Created(c, "created", ToResponse(*cat))
+	response.Created(c, "created", ToResponse(*label))
 }
 
 func (h *Handler) Update(c *gin.Context) {
@@ -81,18 +81,18 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	var in CategoryInput
+	var in LabelInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	cat, err := h.service.Update(id, uid, in)
+	label, err := h.service.Update(id, uid, in)
 	if err != nil {
 		respondLookupError(c, err)
 		return
 	}
-	response.OK(c, "updated", ToResponse(*cat))
+	response.OK(c, "updated", ToResponse(*label))
 }
 
 func (h *Handler) Remove(c *gin.Context) {
@@ -122,9 +122,12 @@ func parseID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 func respondLookupError(c *gin.Context, err error) {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		response.Error(c, http.StatusNotFound, "category not found")
-		return
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		response.Error(c, http.StatusNotFound, "label not found")
+	case errors.Is(err, ErrDuplicateName):
+		response.Error(c, http.StatusConflict, err.Error())
+	default:
+		response.Error(c, http.StatusInternalServerError, err.Error())
 	}
-	response.Error(c, http.StatusInternalServerError, err.Error())
 }

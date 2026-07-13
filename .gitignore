@@ -7,3 +7,6 @@ build-errors.log
 
 # Binary
 *.exe
+
+# Uploaded files (local disk storage, not for version control)
+/uploads/

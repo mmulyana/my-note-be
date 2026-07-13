@@ -11,6 +11,8 @@ type User struct {
 	ID        uuid.UUID `gorm:"primaryKey"`
 	Email     string    `gorm:"uniqueIndex"`
 	Password  string
+	Username  *string
+	Photo     *string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`

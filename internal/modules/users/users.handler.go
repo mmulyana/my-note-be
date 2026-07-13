@@ -2,6 +2,8 @@ package users
 
 import (
 	"net/http"
+	"os"
+	"strings"
 
 	"my-note-be/internal/middleware"
 	"my-note-be/internal/response"
@@ -77,8 +79,33 @@ func (h *Handler) Me(c *gin.Context) {
 		response.Error(c, http.StatusNotFound, "user not found")
 		return
 	}
-	response.OK(c, "ok", ProfileResponse{
-		ID:    user.ID.String(),
-		Email: user.Email,
-	})
+	response.OK(c, "ok", toProfileResponse(user))
+}
+
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var in UpdateProfileInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	existing, err := h.service.FindByID(userID)
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "user not found")
+		return
+	}
+
+	updated, err := h.service.UpdateProfile(userID, in)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if in.Photo != nil && existing.Photo != nil && *existing.Photo != "" && *existing.Photo != *in.Photo {
+		os.Remove(strings.TrimPrefix(*existing.Photo, "/"))
+	}
+
+	response.OK(c, "updated", toProfileResponse(updated))
 }

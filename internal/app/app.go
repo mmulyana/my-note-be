@@ -8,6 +8,7 @@ import (
 	"my-note-be/internal/modules/labels"
 	"my-note-be/internal/modules/notes"
 	"my-note-be/internal/modules/todos"
+	"my-note-be/internal/modules/uploads"
 	"my-note-be/internal/modules/users"
 
 	"github.com/gin-contrib/cors"
@@ -31,6 +32,8 @@ func Run() {
 
 	middleware.SetSecret(cfg.JWTSecret)
 
+	r.Static("/uploads", "./uploads")
+
 	api := r.Group("/api")
 	users.RegisterRoutes(api, db)
 
@@ -41,6 +44,7 @@ func Run() {
 	folders.RegisterRoutes(protected, db)
 	labels.RegisterRoutes(protected, db)
 	todos.RegisterRoutes(protected, db)
+	uploads.RegisterRoutes(protected)
 
 	r.Run(":" + cfg.Port)
 }

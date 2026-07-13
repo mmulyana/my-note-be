@@ -57,3 +57,21 @@ func (s *Service) FindByID(id string) (*User, error) {
 	}
 	return &user, nil
 }
+
+func (s *Service) UpdateProfile(id string, in UpdateProfileInput) (*User, error) {
+	updates := map[string]any{}
+	if in.Username != nil {
+		updates["username"] = *in.Username
+	}
+	if in.Photo != nil {
+		updates["photo"] = *in.Photo
+	}
+	if len(updates) == 0 {
+		return s.FindByID(id)
+	}
+
+	if err := s.db.Model(&User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	return s.FindByID(id)
+}

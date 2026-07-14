@@ -181,11 +181,11 @@ func (s *Service) Update(id string, userID uuid.UUID, in TodoUpdateInput) (*Todo
 	if in.Checked != nil {
 		fields["checked"] = *in.Checked
 	}
-	if in.Deadline != nil {
-		fields["deadline"] = parseDate(in.Deadline)
+	if in.Deadline.Present {
+		fields["deadline"] = parseDate(in.Deadline.Value)
 	}
-	if in.Today != nil {
-		fields["today"] = parseDate(in.Today)
+	if in.Today.Present {
+		fields["today"] = parseDate(in.Today.Value)
 	}
 	if in.Priority != nil {
 		fields["priority"] = *in.Priority
@@ -366,6 +366,41 @@ func (s *Service) FindGroupByDeadline(userID uuid.UUID) ([]DeadlineGroup, error)
 		out[i] = DeadlineGroup{Deadline: dl, Todos: groups[key]}
 	}
 	return out, nil
+}
+
+func (s *Service) FindGroupByToday(userID uuid.UUID, date time.Time) (TodayGroups, error) {
+	var todayTodos []Todo
+	if err := s.db.
+		Joins("JOIN notes ON notes.id = todos.note_id").
+		Where("notes.user_id = ? AND todos.checked = false AND todos.today = ?", userID, date).
+		Order("todos.created_at ASC").
+		Find(&todayTodos).Error; err != nil {
+		return TodayGroups{}, err
+	}
+
+	var overdueTodos []Todo
+	if err := s.db.
+		Joins("JOIN notes ON notes.id = todos.note_id").
+		Where("notes.user_id = ? AND todos.checked = false AND todos.today IS NOT NULL AND todos.today < ?", userID, date).
+		Order("todos.today ASC, todos.created_at ASC").
+		Find(&overdueTodos).Error; err != nil {
+		return TodayGroups{}, err
+	}
+
+	var completedTodos []Todo
+	if err := s.db.
+		Joins("JOIN notes ON notes.id = todos.note_id").
+		Where("notes.user_id = ? AND todos.checked = true AND todos.today IS NOT NULL AND todos.today <= ?", userID, date).
+		Order("todos.today DESC, todos.created_at ASC").
+		Find(&completedTodos).Error; err != nil {
+		return TodayGroups{}, err
+	}
+
+	return TodayGroups{
+		Today:     ToResponses(todayTodos),
+		Overdue:   ToResponses(overdueTodos),
+		Completed: ToResponses(completedTodos),
+	}, nil
 }
 
 func parseDate(s *string) *time.Time {

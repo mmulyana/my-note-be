@@ -1,6 +1,10 @@
 package todos
 
-import "time"
+import (
+	"time"
+
+	"my-note-be/internal/utils"
+)
 
 type TodoInput struct {
 	ID         string   `json:"id" binding:"required"`
@@ -14,11 +18,11 @@ type TodoInput struct {
 }
 
 type TodoUpdateInput struct {
-	Text     *string   `json:"text"`
-	Checked  *bool     `json:"checked"`
-	Deadline *string   `json:"deadline"`
-	Today    *string   `json:"today"`
-	Priority *Priority `json:"priority"`
+	Text     *string              `json:"text"`
+	Checked  *bool                `json:"checked"`
+	Deadline utils.OptionalString `json:"deadline"`
+	Today    utils.OptionalString `json:"today"`
+	Priority *Priority            `json:"priority"`
 }
 
 type TodoResponse struct {
@@ -42,4 +46,10 @@ type NoteGroup struct {
 type DeadlineGroup struct {
 	Deadline *string        `json:"deadline"`
 	Todos    []TodoResponse `json:"todos"`
+}
+
+type TodayGroups struct {
+	Today     []TodoResponse `json:"today"`
+	Overdue   []TodoResponse `json:"overdue"`
+	Completed []TodoResponse `json:"completed"`
 }

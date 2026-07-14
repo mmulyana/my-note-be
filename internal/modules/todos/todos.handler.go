@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"my-note-be/internal/helpers"
 	"my-note-be/internal/response"
@@ -81,6 +82,31 @@ func (h *Handler) FindGroupByDeadline(c *gin.Context) {
 		return
 	}
 	groups, err := h.service.FindGroupByDeadline(uid)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.OK(c, "ok", groups)
+}
+
+func (h *Handler) FindGroupByToday(c *gin.Context) {
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	raw := c.Query("date")
+	if raw == "" {
+		response.Error(c, http.StatusBadRequest, "date is required")
+		return
+	}
+	date, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid date")
+		return
+	}
+
+	groups, err := h.service.FindGroupByToday(uid, date)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

@@ -79,7 +79,7 @@ func (h *Handler) Me(c *gin.Context) {
 		response.Error(c, http.StatusNotFound, "user not found")
 		return
 	}
-	response.OK(c, "ok", toProfileResponse(user))
+	response.OK(c, "ok", ToProfileResponse(user))
 }
 
 func (h *Handler) UpdateProfile(c *gin.Context) {
@@ -107,5 +107,5 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		os.Remove(strings.TrimPrefix(*existing.Photo, "/"))
 	}
 
-	response.OK(c, "updated", toProfileResponse(updated))
+	response.OK(c, "updated", ToProfileResponse(updated))
 }

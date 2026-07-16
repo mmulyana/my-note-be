@@ -27,12 +27,3 @@ type ProfileResponse struct {
 	Username *string `json:"username"`
 	Photo    *string `json:"photo"`
 }
-
-func toProfileResponse(u *User) ProfileResponse {
-	return ProfileResponse{
-		ID:       u.ID.String(),
-		Email:    u.Email,
-		Username: u.Username,
-		Photo:    u.Photo,
-	}
-}

@@ -15,6 +15,7 @@ type FolderResponse struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Color     string    `json:"color"`
+	Secret    bool      `json:"secret"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -32,6 +33,7 @@ func ToResponse(f Folder) FolderResponse {
 		ID:        f.ID.String(),
 		Name:      f.Name,
 		Color:     f.Color,
+		Secret:    f.Secret,
 		CreatedAt: f.CreatedAt,
 		UpdatedAt: f.UpdatedAt,
 	}

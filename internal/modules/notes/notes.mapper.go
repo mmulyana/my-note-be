@@ -14,16 +14,17 @@ type LabelResponse struct {
 }
 
 type FolderResponse struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Color string    `json:"color"`
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Color  string    `json:"color"`
+	Secret bool      `json:"secret"`
 }
 
 func toFolderResponse(f *folders.Folder) *FolderResponse {
 	if f == nil {
 		return nil
 	}
-	return &FolderResponse{ID: f.ID, Name: f.Name, Color: f.Color}
+	return &FolderResponse{ID: f.ID, Name: f.Name, Color: f.Color, Secret: f.Secret}
 }
 
 type NoteListItemResponse struct {

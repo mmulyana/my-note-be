@@ -12,6 +12,7 @@ type Folder struct {
 	UserID    uuid.UUID      `gorm:"type:uuid;not null;index" json:"userId"`
 	Name      string         `gorm:"size:255;not null" json:"name"`
 	Color     string         `gorm:"size:32;not null;default:'default'" json:"color"`
+	Secret    bool           `gorm:"not null;default:false" json:"secret"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

@@ -7,8 +7,9 @@ import (
 )
 
 type FolderInput struct {
-	Name  string `json:"name" binding:"required"`
-	Color string `json:"color"`
+	Name   string `json:"name" binding:"required"`
+	Color  string `json:"color"`
+	Secret bool   `json:"secret"`
 }
 
 type FolderResponse struct {
@@ -25,7 +26,7 @@ func (in FolderInput) ToModel(userID uuid.UUID) Folder {
 	if color == "" {
 		color = "default"
 	}
-	return Folder{UserID: userID, Name: in.Name, Color: color}
+	return Folder{UserID: userID, Name: in.Name, Color: color, Secret: in.Secret}
 }
 
 func ToResponse(f Folder) FolderResponse {

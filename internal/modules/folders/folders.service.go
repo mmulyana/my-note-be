@@ -53,8 +53,9 @@ func (s *Service) Update(id uuid.UUID, userID uuid.UUID, in FolderInput) (*Folde
 		color = "default"
 	}
 	if err := s.db.Model(&f).Updates(map[string]any{
-		"name":  in.Name,
-		"color": color,
+		"name":   in.Name,
+		"color":  color,
+		"secret": in.Secret,
 	}).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateName

@@ -67,7 +67,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		Preload("Folder").
 		Where("notes.user_id = ?", userID).
 		Scopes(filters).
-		Order("notes.updated_at DESC").
+		Order("notes.created_at DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&notes).Error

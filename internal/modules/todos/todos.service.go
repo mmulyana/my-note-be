@@ -287,18 +287,30 @@ func (s *Service) Remove(id string, userID uuid.UUID) error {
 			return err
 		}
 
-		return tx.Table("notes").Where("id = ?", t.NoteID).Updates(map[string]any{
-			"content":    removeTodoFromContent(row.Content, id),
-			"preview":    removeTodoFromContent(row.Preview, id),
+		// note: <li> not found in content/preview is fine, skip writing it back
+		noteUpdates := map[string]any{
 			"todo_total": gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ?)", t.NoteID),
 			"todo_done":  gorm.Expr("(SELECT COUNT(*) FROM todos WHERE note_id = ? AND checked = true)", t.NoteID),
-		}).Error
+		}
+		if content, ok := removeTodoFromContent(row.Content, id); ok {
+			noteUpdates["content"] = content
+		}
+		if preview, ok := removeTodoFromContent(row.Preview, id); ok {
+			noteUpdates["preview"] = preview
+		}
+
+		return tx.Table("notes").Where("id = ?", t.NoteID).Updates(noteUpdates).Error
 	})
 }
 
-func removeTodoFromContent(content, todoID string) string {
+// removeTodoFromContent strips the todo's <li>. bool = found.
+func removeTodoFromContent(content, todoID string) (string, bool) {
 	pattern := fmt.Sprintf(`<li[^>]*\sdata-id="%s"[^>]*>.*?</li>`, regexp.QuoteMeta(todoID))
-	return regexp.MustCompile(pattern).ReplaceAllString(content, "")
+	re := regexp.MustCompile(pattern)
+	if !re.MatchString(content) {
+		return content, false
+	}
+	return re.ReplaceAllString(content, ""), true
 }
 
 func (s *Service) FindGroupByNotes(userID uuid.UUID) ([]NoteGroup, error) {

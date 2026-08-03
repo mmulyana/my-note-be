@@ -38,9 +38,10 @@ type TodoResponse struct {
 }
 
 type NoteGroup struct {
-	NoteID string         `json:"noteId"`
-	Title  string         `json:"title"`
-	Todos  []TodoResponse `json:"todos"`
+	NoteID     string         `json:"noteId"`
+	Title      string         `json:"title"`
+	Todos      []TodoResponse `json:"todos"`
+	IsComplete bool           `json:"isComplete"`
 }
 
 type DeadlineGroup struct {

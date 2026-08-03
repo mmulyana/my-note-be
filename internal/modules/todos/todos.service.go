@@ -24,7 +24,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, page, limit int)
 
 	q := s.db.Model(&Todo{}).
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ?", userID)
+		Where("notes.user_id = ? AND notes.archived = false", userID)
 
 	if labelID != nil {
 		q = q.Joins("JOIN note_labels nl ON nl.note_id = todos.note_id").
@@ -40,7 +40,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, page, limit int)
 	var todos []Todo
 	dataQ := s.db.
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ?", userID)
+		Where("notes.user_id = ? AND notes.archived = false", userID)
 
 	if labelID != nil {
 		dataQ = dataQ.Joins("JOIN note_labels nl ON nl.note_id = todos.note_id").
@@ -322,7 +322,7 @@ func (s *Service) FindGroupByNotes(userID uuid.UUID) ([]NoteGroup, error) {
 	err := s.db.Table("notes").
 		Select("notes.id, notes.title").
 		Joins("INNER JOIN todos ON todos.note_id = notes.id").
-		Where("notes.user_id = ?", userID).
+		Where("notes.user_id = ? AND notes.archived = false", userID).
 		Group("notes.id, notes.title").
 		Order("notes.updated_at DESC").
 		Scan(&notes).Error
@@ -337,19 +337,32 @@ func (s *Service) FindGroupByNotes(userID uuid.UUID) ([]NoteGroup, error) {
 			return nil, err
 		}
 		out[i] = NoteGroup{
-			NoteID: n.ID,
-			Title:  n.Title,
-			Todos:  ToResponses(todos),
+			NoteID:     n.ID,
+			Title:      n.Title,
+			Todos:      ToResponses(todos),
+			IsComplete: allChecked(todos),
 		}
 	}
 	return out, nil
+}
+
+func allChecked(todos []Todo) bool {
+	if len(todos) == 0 {
+		return false
+	}
+	for _, t := range todos {
+		if !t.Checked {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) FindGroupByDeadline(userID uuid.UUID) ([]DeadlineGroup, error) {
 	var todos []Todo
 	err := s.db.
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ?", userID).
+		Where("notes.user_id = ? AND notes.archived = false", userID).
 		Order("todos.deadline ASC NULLS LAST, todos.created_at ASC").
 		Find(&todos).Error
 	if err != nil {
@@ -384,7 +397,7 @@ func (s *Service) FindGroupByToday(userID uuid.UUID, date time.Time) (TodayGroup
 	var todayTodos []Todo
 	if err := s.db.
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ? AND todos.checked = false AND todos.today = ?", userID, date).
+		Where("notes.user_id = ? AND notes.archived = false AND todos.checked = false AND todos.today = ?", userID, date).
 		Order("todos.created_at ASC").
 		Find(&todayTodos).Error; err != nil {
 		return TodayGroups{}, err
@@ -393,7 +406,7 @@ func (s *Service) FindGroupByToday(userID uuid.UUID, date time.Time) (TodayGroup
 	var overdueTodos []Todo
 	if err := s.db.
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ? AND todos.checked = false AND todos.today IS NOT NULL AND todos.today < ?", userID, date).
+		Where("notes.user_id = ? AND notes.archived = false AND todos.checked = false AND todos.today IS NOT NULL AND todos.today < ?", userID, date).
 		Order("todos.today ASC, todos.created_at ASC").
 		Find(&overdueTodos).Error; err != nil {
 		return TodayGroups{}, err
@@ -402,7 +415,7 @@ func (s *Service) FindGroupByToday(userID uuid.UUID, date time.Time) (TodayGroup
 	var completedTodos []Todo
 	if err := s.db.
 		Joins("JOIN notes ON notes.id = todos.note_id").
-		Where("notes.user_id = ? AND todos.checked = true AND todos.today IS NOT NULL AND todos.today <= ?", userID, date).
+		Where("notes.user_id = ? AND notes.archived = false AND todos.checked = true AND todos.today IS NOT NULL AND todos.today <= ?", userID, date).
 		Order("todos.today DESC, todos.created_at ASC").
 		Find(&completedTodos).Error; err != nil {
 		return TodayGroups{}, err

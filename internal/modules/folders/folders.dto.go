@@ -47,3 +47,29 @@ func ToResponses(folders []Folder) []FolderResponse {
 	}
 	return out
 }
+
+type FolderNoteResponse struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
+type FolderWithNotesResponse struct {
+	FolderResponse
+	Notes []FolderNoteResponse `json:"notes"`
+}
+
+func ToWithNotesResponse(f Folder, notes []FolderNote) FolderWithNotesResponse {
+	out := make([]FolderNoteResponse, len(notes))
+	for i, n := range notes {
+		out[i] = FolderNoteResponse{Title: n.Title, Text: n.Text}
+	}
+	return FolderWithNotesResponse{FolderResponse: ToResponse(f), Notes: out}
+}
+
+func ToWithNotesResponses(folders []Folder, notesByFolder map[uuid.UUID][]FolderNote) []FolderWithNotesResponse {
+	out := make([]FolderWithNotesResponse, len(folders))
+	for i, f := range folders {
+		out[i] = ToWithNotesResponse(f, notesByFolder[f.ID])
+	}
+	return out
+}

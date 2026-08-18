@@ -22,7 +22,7 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, archived *bool, pinned *bool, search string, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
 	search = strings.TrimSpace(search)
@@ -34,6 +34,13 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		}
 		if folderID != nil {
 			db = db.Where("notes.folder_id = ?", *folderID)
+		}
+		if hasFolder != nil {
+			if *hasFolder {
+				db = db.Where("notes.folder_id IS NOT NULL")
+			} else {
+				db = db.Where("notes.folder_id IS NULL")
+			}
 		}
 		if archived != nil {
 			db = db.Where("notes.archived = ?", *archived)

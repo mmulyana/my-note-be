@@ -47,6 +47,17 @@ func (h *Handler) FindAll(c *gin.Context) {
 		folderID = &id
 	}
 
+	// note: hasFolder=true => only notes inside a folder, false => only loose notes
+	var hasFolder *bool
+	if raw := c.Query("hasFolder"); raw != "" {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid hasFolder")
+			return
+		}
+		hasFolder = &v
+	}
+
 	var archived *bool
 	if raw := c.Query("archived"); raw != "" {
 		if v, err := strconv.ParseBool(raw); err == nil {
@@ -80,7 +91,7 @@ func (h *Handler) FindAll(c *gin.Context) {
 
 	search := c.Query("q")
 
-	notes, total, err := h.service.FindAll(uid, labelID, folderID, archived, pinned, search, page, limit)
+	notes, total, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, search, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

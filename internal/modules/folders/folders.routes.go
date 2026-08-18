@@ -11,6 +11,7 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	g := r.Group("/folders")
 	{
 		g.GET("", h.FindAll)
+		g.GET("/with-notes", h.FindAllWithNotes)
 		g.GET("/:id", h.FindOne)
 		g.POST("", h.Create)
 		g.PATCH("/:id", h.Update)

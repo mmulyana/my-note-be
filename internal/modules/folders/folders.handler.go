@@ -3,6 +3,7 @@ package folders
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"my-note-be/internal/helpers"
 	"my-note-be/internal/response"
@@ -31,6 +32,37 @@ func (h *Handler) FindAll(c *gin.Context) {
 		return
 	}
 	response.OK(c, "ok", ToResponses(folders))
+}
+
+func (h *Handler) FindAllWithNotes(c *gin.Context) {
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			limit = v
+			if limit > 100 {
+				limit = 100
+			}
+		}
+	}
+
+	folders, total, notesByFolder, err := h.service.FindAllWithNotes(uid, page, limit)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.OKPaginated(c, "ok", ToWithNotesResponses(folders, notesByFolder), page, limit, total)
 }
 
 func (h *Handler) FindOne(c *gin.Context) {

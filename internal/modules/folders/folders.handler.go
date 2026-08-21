@@ -56,8 +56,13 @@ func (h *Handler) FindAllWithNotes(c *gin.Context) {
 			}
 		}
 	}
+	var pinned *bool
+	if raw := c.Query("pinned"); raw != "" {
+		v := raw == "true"
+		pinned = &v
+	}
 
-	result, err := h.service.FindAllWithNotes(uid, page, limit)
+	result, err := h.service.FindAllWithNotes(uid, page, limit, pinned)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

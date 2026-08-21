@@ -97,16 +97,20 @@ type FoldersWithNotesResult struct {
 	NoteCounts    map[uuid.UUID]int64
 }
 
-func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int) (*FoldersWithNotesResult, error) {
+func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int, pinned *bool) (*FoldersWithNotesResult, error) {
+	q := s.db.Model(&Folder{}).Where("user_id = ?", userID)
+	if pinned != nil {
+		q = q.Where("pinned = ?", *pinned)
+	}
+
 	var total int64
-	if err := s.db.Model(&Folder{}).Where("user_id = ?", userID).Count(&total).Error; err != nil {
+	if err := q.Count(&total).Error; err != nil {
 		return nil, err
 	}
 
 	var folders []Folder
 	offset := (page - 1) * limit
-	if err := s.db.
-		Where("user_id = ?", userID).
+	if err := q.
 		Order("name").
 		Offset(offset).
 		Limit(limit).

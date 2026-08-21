@@ -57,12 +57,12 @@ func (h *Handler) FindAllWithNotes(c *gin.Context) {
 		}
 	}
 
-	folders, total, notesByFolder, err := h.service.FindAllWithNotes(uid, page, limit)
+	folders, total, notesByFolder, noteCounts, err := h.service.FindAllWithNotes(uid, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response.OKPaginated(c, "ok", ToWithNotesResponses(folders, notesByFolder), page, limit, total)
+	response.OKPaginated(c, "ok", ToWithNotesResponses(folders, notesByFolder, noteCounts), page, limit, total)
 }
 
 func (h *Handler) FindOne(c *gin.Context) {

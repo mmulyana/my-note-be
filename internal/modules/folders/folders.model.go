@@ -13,6 +13,7 @@ type Folder struct {
 	Name      string         `gorm:"size:255;not null" json:"name"`
 	Color     string         `gorm:"size:32;not null;default:'default'" json:"color"`
 	Secret    bool           `gorm:"not null;default:false" json:"secret"`
+	Pinned    bool           `gorm:"not null;default:false" json:"pinned"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

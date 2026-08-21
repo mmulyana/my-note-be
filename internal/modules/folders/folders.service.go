@@ -56,6 +56,7 @@ func (s *Service) Update(id uuid.UUID, userID uuid.UUID, in FolderInput) (*Folde
 		"name":   in.Name,
 		"color":  color,
 		"secret": in.Secret,
+		"pinned": in.Pinned,
 	}).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateName
@@ -84,10 +85,15 @@ type FolderNote struct {
 	Text     string    `gorm:"column:text"`
 }
 
-func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int) ([]Folder, int64, map[uuid.UUID][]FolderNote, error) {
+type FolderNoteCount struct {
+	FolderID   uuid.UUID `gorm:"column:folder_id"`
+	TotalNotes int64     `gorm:"column:total_notes"`
+}
+
+func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int) ([]Folder, int64, map[uuid.UUID][]FolderNote, map[uuid.UUID]int64, error) {
 	var total int64
 	if err := s.db.Model(&Folder{}).Where("user_id = ?", userID).Count(&total).Error; err != nil {
-		return nil, 0, nil, err
+		return nil, 0, nil, nil, err
 	}
 
 	var folders []Folder
@@ -98,12 +104,13 @@ func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int) ([]Folder,
 		Offset(offset).
 		Limit(limit).
 		Find(&folders).Error; err != nil {
-		return nil, 0, nil, err
+		return nil, 0, nil, nil, err
 	}
 
 	grouped := make(map[uuid.UUID][]FolderNote, len(folders))
+	noteCounts := make(map[uuid.UUID]int64, len(folders))
 	if len(folders) == 0 {
-		return folders, total, grouped, nil
+		return folders, total, grouped, noteCounts, nil
 	}
 
 	ids := make([]uuid.UUID, len(folders))
@@ -123,11 +130,25 @@ func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int) ([]Folder,
 		) n
 		WHERE f.id IN ?
 	`, userID, maxNotesPerFolder, ids).Scan(&rows).Error; err != nil {
-		return nil, 0, nil, err
+		return nil, 0, nil, nil, err
 	}
 
 	for _, r := range rows {
 		grouped[r.FolderID] = append(grouped[r.FolderID], r)
 	}
-	return folders, total, grouped, nil
+
+	var counts []FolderNoteCount
+	if err := s.db.Raw(`
+		SELECT folder_id, COUNT(*) AS total_notes
+		FROM notes
+		WHERE folder_id IN ? AND user_id = ? AND archived = false AND deleted_at IS NULL
+		GROUP BY folder_id
+	`, ids, userID).Scan(&counts).Error; err != nil {
+		return nil, 0, nil, nil, err
+	}
+	for _, c := range counts {
+		noteCounts[c.FolderID] = c.TotalNotes
+	}
+
+	return folders, total, grouped, noteCounts, nil
 }

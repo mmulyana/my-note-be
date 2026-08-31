@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -23,8 +26,8 @@ func SetSecret(secret string) {
 	jwtSecret = []byte(secret)
 }
 
-func GenerateToken(userID string) (string, int64, error) {
-	expiresAt := time.Now().Add(24 * time.Hour).Unix()
+func GenerateAccessToken(userID string, ttl time.Duration) (string, int64, error) {
+	expiresAt := time.Now().Add(ttl).Unix()
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -40,6 +43,23 @@ func GenerateToken(userID string) (string, int64, error) {
 	}
 
 	return tokenString, expiresAt, nil
+}
+
+func GenerateToken(userID string) (string, int64, error) {
+	return GenerateAccessToken(userID, 15*time.Minute)
+}
+
+func GenerateRandomToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func HashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
 }
 
 func VerifyToken(tokenString string) (*Claims, error) {

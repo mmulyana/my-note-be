@@ -11,9 +11,14 @@ type LoginInput struct {
 }
 
 type TokenResponse struct {
-	AccessToken string `json:"accessToken"`
-	ExpiresAt   int64  `json:"expiresAt"`
-	Email       string `json:"email"`
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+	ExpiresAt    int64  `json:"expiresAt"`
+	Email        string `json:"email,omitempty"`
+}
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 type UpdateProfileInput struct {

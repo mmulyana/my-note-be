@@ -27,3 +27,12 @@ func NewUser(email, password string) *User {
 		UpdatedAt: time.Now(),
 	}
 }
+
+type RefreshToken struct {
+	ID        uuid.UUID `gorm:"primaryKey"`
+	UserID    uuid.UUID `gorm:"not null;index"`
+	TokenHash string    `gorm:"uniqueIndex;not null"`
+	ExpiresAt time.Time `gorm:"not null"`
+	CreatedAt time.Time
+}
+

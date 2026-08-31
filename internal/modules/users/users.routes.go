@@ -12,6 +12,8 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	{
 		g.POST("/register", h.Register)
 		g.POST("/login", h.Login)
+		g.POST("/refresh", h.RefreshToken)
+		g.POST("/logout", h.Logout)
 	}
 }
 

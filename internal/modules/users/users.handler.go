@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"my-note-be/internal/constants"
 	"my-note-be/internal/middleware"
 	"my-note-be/internal/response"
 
@@ -17,7 +18,9 @@ type Handler struct {
 }
 
 func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{service: NewService(db)}
+	return &Handler{
+		service: NewService(db),
+	}
 }
 
 func (h *Handler) Register(c *gin.Context) {
@@ -33,16 +36,23 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := middleware.GenerateToken(user.ID.String())
+	token, expiresAt, err := middleware.GenerateAccessToken(user.ID.String(), constants.AccessTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	refreshToken, err := h.service.CreateRefreshToken(user.ID, constants.RefreshTokenTTL)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	response.Created(c, "registered", TokenResponse{
-		AccessToken: token,
-		ExpiresAt:   expiresAt,
-		Email:       user.Email,
+		AccessToken:  token,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+		Email:        user.Email,
 	})
 }
 
@@ -59,17 +69,66 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, expiresAt, err := middleware.GenerateToken(user.ID.String())
+	token, expiresAt, err := middleware.GenerateAccessToken(user.ID.String(), constants.AccessTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	refreshToken, err := h.service.CreateRefreshToken(user.ID, constants.RefreshTokenTTL)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	response.OK(c, "logged in", TokenResponse{
-		AccessToken: token,
-		ExpiresAt:   expiresAt,
-		Email:       user.Email,
+		AccessToken:  token,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+		Email:        user.Email,
 	})
+}
+
+func (h *Handler) RefreshToken(c *gin.Context) {
+	var in RefreshTokenInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, newRefreshToken, err := h.service.RotateRefreshToken(in.RefreshToken, constants.RefreshTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	token, expiresAt, err := middleware.GenerateAccessToken(user.ID.String(), constants.AccessTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, "token refreshed", TokenResponse{
+		AccessToken:  token,
+		RefreshToken: newRefreshToken,
+		ExpiresAt:    expiresAt,
+		Email:        user.Email,
+	})
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	var in RefreshTokenInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.RevokeRefreshToken(in.RefreshToken); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.OK(c, "logged out", nil)
 }
 
 func (h *Handler) Me(c *gin.Context) {

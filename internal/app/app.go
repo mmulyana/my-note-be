@@ -4,6 +4,7 @@ import (
 	"my-note-be/internal/config"
 	"my-note-be/internal/database"
 	"my-note-be/internal/middleware"
+	"my-note-be/internal/modules/feedback"
 	"my-note-be/internal/modules/folders"
 	"my-note-be/internal/modules/labels"
 	"my-note-be/internal/modules/notes"
@@ -45,6 +46,10 @@ func Run() {
 	labels.RegisterRoutes(protected, db)
 	todos.RegisterRoutes(protected, db)
 	uploads.RegisterRoutes(protected)
+	feedback.RegisterRoutes(protected, db, feedback.RelayHubConfig{
+		BaseURL: cfg.RelayHubBaseURL,
+		APIKey:  cfg.RelayHubToken,
+	})
 
 	r.Run(":" + cfg.Port)
 }

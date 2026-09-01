@@ -6,10 +6,12 @@ import (
 )
 
 type Config struct {
-	DatabaseURL    string
-	Port           string
-	AllowedOrigins []string
-	JWTSecret      string
+	DatabaseURL     string
+	Port            string
+	AllowedOrigins  []string
+	JWTSecret       string
+	RelayHubBaseURL string
+	RelayHubToken   string
 }
 
 func Load() *Config {
@@ -28,10 +30,17 @@ func Load() *Config {
 		jwtSecret = "your-secret-key"
 	}
 
+	relayHubBaseURL := os.Getenv("RELAY_HUB_BASE_URL")
+	if relayHubBaseURL == "" {
+		relayHubBaseURL = "http://localhost:8080"
+	}
+
 	return &Config{
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		Port:           port,
-		AllowedOrigins: strings.Split(origins, ","),
-		JWTSecret:      jwtSecret,
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		Port:            port,
+		AllowedOrigins:  strings.Split(origins, ","),
+		JWTSecret:       jwtSecret,
+		RelayHubBaseURL: relayHubBaseURL,
+		RelayHubToken:   os.Getenv("RELAY_HUB_TOKEN"),
 	}
 }

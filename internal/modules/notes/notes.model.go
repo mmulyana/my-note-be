@@ -35,6 +35,7 @@ type Note struct {
 	UpdatedAt time.Time  `json:"updatedAt"`
 
 	Todos  []Todo          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
+	Links  []Link          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
 	Labels []labels.Label  `gorm:"many2many:note_labels;" json:"-"`
 	Folder *folders.Folder `gorm:"foreignKey:FolderID;references:ID" json:"-"`
 }
@@ -50,4 +51,18 @@ type Todo struct {
 	Tags      json.RawMessage `gorm:"type:jsonb;not null;default:'[]'" json:"-"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// Link nyalin links.Link. Ditaruh di sini biar note save nulis row-nya dalam transaksi yang sama, kayak Todo.
+type Link struct {
+	ID          string    `gorm:"type:text;primaryKey" json:"id"`
+	NoteID      string    `gorm:"type:text;not null;index" json:"noteId"`
+	URL         string    `gorm:"column:url;type:text;not null;default:''" json:"url"`
+	Title       string    `gorm:"type:text;not null;default:''" json:"title"`
+	Description string    `gorm:"type:text;not null;default:''" json:"description"`
+	Image       string    `gorm:"type:text;not null;default:''" json:"image"`
+	Favicon     string    `gorm:"type:text;not null;default:''" json:"favicon"`
+	SiteName    string    `gorm:"column:site_name;type:text;not null;default:''" json:"siteName"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }

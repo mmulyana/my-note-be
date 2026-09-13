@@ -156,6 +156,10 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 			}
 		}
 
+		if err := applyLinkDiff(tx, note.ID, in.LinkDiff); err != nil {
+			return err
+		}
+
 		return tx.Exec(`
 			UPDATE notes SET
 				todo_total = (SELECT COUNT(*) FROM todos WHERE note_id = ?),
@@ -247,6 +251,10 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			}
 		}
 
+		if err := applyLinkDiff(tx, id, in.LinkDiff); err != nil {
+			return err
+		}
+
 		return tx.Exec(`
 			UPDATE notes SET
 				todo_total = (SELECT COUNT(*) FROM todos WHERE note_id = ?),
@@ -269,6 +277,78 @@ func (s *Service) Remove(id string, userID uuid.UUID) error {
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+// applyLinkDiff nulis perubahan link di dalam transaksi note-nya, biar note dan link-nya nggak pernah beda isi
+func applyLinkDiff(tx *gorm.DB, noteID string, diff LinkDiff) error {
+	if len(diff.Removed) > 0 {
+		if err := tx.Where("id IN ? AND note_id = ?", diff.Removed, noteID).
+			Delete(&Link{}).Error; err != nil {
+			return err
+		}
+	}
+
+	for _, a := range diff.Added {
+		link := Link{
+			ID:          a.ID,
+			NoteID:      noteID,
+			URL:         a.URL,
+			Title:       a.Title,
+			Description: a.Description,
+			Image:       a.Image,
+			Favicon:     a.Favicon,
+			SiteName:    a.SiteName,
+		}
+		// row "added" bisa udah ada: card kesimpen pas masih loading, lalu kesimpen lagi pas metadata-nya dateng
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"url", "title", "description", "image", "favicon", "site_name", "updated_at",
+			}),
+		}).Create(&link).Error; err != nil {
+			return err
+		}
+	}
+
+	for _, u := range diff.Updated {
+		fields := buildLinkUpdateMap(u.Fields)
+		if len(fields) == 0 {
+			continue
+		}
+		fields["updated_at"] = gorm.Expr("now()")
+		if err := tx.Model(&Link{}).
+			Where("id = ? AND note_id = ?", u.ID, noteID).
+			Updates(fields).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+var linkColumns = map[string]string{
+	"url":         "url",
+	"title":       "title",
+	"description": "description",
+	"image":       "image",
+	"favicon":     "favicon",
+	"siteName":    "site_name",
+}
+
+// cuma field yang dikenal yang lolos, biar key asing nggak bisa nyasar jadi nama kolom di UPDATE
+func buildLinkUpdateMap(fields map[string]json.RawMessage) map[string]any {
+	out := map[string]any{}
+	for key, column := range linkColumns {
+		raw, ok := fields[key]
+		if !ok {
+			continue
+		}
+		var v string
+		if json.Unmarshal(raw, &v) == nil {
+			out[column] = v
+		}
+	}
+	return out
 }
 
 func buildUpdateMap(fields map[string]json.RawMessage) map[string]any {

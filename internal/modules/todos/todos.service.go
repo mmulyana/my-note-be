@@ -313,49 +313,36 @@ func removeTodoFromContent(content, todoID string) (string, bool) {
 	return re.ReplaceAllString(content, ""), true
 }
 
-func (s *Service) FindGroupByNotes(userID uuid.UUID) ([]NoteGroup, error) {
-	type noteRow struct {
-		ID    string
-		Title string
-	}
-	var notes []noteRow
-	err := s.db.Table("notes").
-		Select("notes.id, notes.title").
-		Joins("INNER JOIN todos ON todos.note_id = notes.id").
+func (s *Service) FindGroupByCreatedAt(userID uuid.UUID, from, to time.Time, loc *time.Location) ([]DateGroup, error) {
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	end := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, 1)
+
+	var todos []Todo
+	err := s.db.
+		Joins("JOIN notes ON notes.id = todos.note_id").
 		Where("notes.user_id = ? AND notes.archived = false", userID).
-		Group("notes.id, notes.title").
-		Order("notes.updated_at DESC").
-		Scan(&notes).Error
+		Where("todos.created_at >= ? AND todos.created_at < ?", start, end).
+		Order("todos.created_at ASC").
+		Find(&todos).Error
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]NoteGroup, len(notes))
-	for i, n := range notes {
-		var todos []Todo
-		if err := s.db.Where("note_id = ?", n.ID).Order("created_at ASC").Find(&todos).Error; err != nil {
-			return nil, err
+	order := []string{}
+	groups := map[string][]TodoResponse{}
+	for _, t := range todos {
+		key := t.CreatedAt.In(loc).Format("2006-01-02")
+		if _, exists := groups[key]; !exists {
+			order = append(order, key)
 		}
-		out[i] = NoteGroup{
-			NoteID:     n.ID,
-			Title:      n.Title,
-			Todos:      ToResponses(todos),
-			IsComplete: allChecked(todos),
-		}
+		groups[key] = append(groups[key], ToResponse(t))
+	}
+
+	out := make([]DateGroup, len(order))
+	for i, key := range order {
+		out[i] = DateGroup{Date: key, Todos: groups[key]}
 	}
 	return out, nil
-}
-
-func allChecked(todos []Todo) bool {
-	if len(todos) == 0 {
-		return false
-	}
-	for _, t := range todos {
-		if !t.Checked {
-			return false
-		}
-	}
-	return true
 }
 
 func (s *Service) FindGroupByDeadline(userID uuid.UUID) ([]DeadlineGroup, error) {

@@ -11,7 +11,7 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	g := r.Group("/todos")
 	{
 		g.GET("", h.FindAll)
-		g.GET("/group/notes", h.FindGroupByNotes)
+		g.GET("/group/created", h.FindGroupByCreatedAt)
 		g.GET("/group/deadline", h.FindGroupByDeadline)
 		g.GET("/group/today", h.FindGroupByToday)
 		g.GET("/:id", h.FindOne)

@@ -37,11 +37,9 @@ type TodoResponse struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-type NoteGroup struct {
-	NoteID     string         `json:"noteId"`
-	Title      string         `json:"title"`
-	Todos      []TodoResponse `json:"todos"`
-	IsComplete bool           `json:"isComplete"`
+type DateGroup struct {
+	Date  string         `json:"date"`
+	Todos []TodoResponse `json:"todos"`
 }
 
 type DeadlineGroup struct {

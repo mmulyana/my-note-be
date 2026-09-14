@@ -63,17 +63,55 @@ func (h *Handler) FindAll(c *gin.Context) {
 	response.OKPaginated(c, "ok", ToResponses(todos), page, limit, total)
 }
 
-func (h *Handler) FindGroupByNotes(c *gin.Context) {
+func (h *Handler) FindGroupByCreatedAt(c *gin.Context) {
 	uid, ok := helpers.ParseUserID(c)
 	if !ok {
 		return
 	}
-	groups, err := h.service.FindGroupByNotes(uid)
+
+	loc := time.UTC
+	if raw := c.Query("tz"); raw != "" {
+		l, err := time.LoadLocation(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "invalid tz")
+			return
+		}
+		loc = l
+	}
+
+	from, ok := parseDateQuery(c, "from", loc)
+	if !ok {
+		return
+	}
+	to, ok := parseDateQuery(c, "to", loc)
+	if !ok {
+		return
+	}
+	if to.Before(from) {
+		response.Error(c, http.StatusBadRequest, "to must not be before from")
+		return
+	}
+
+	groups, err := h.service.FindGroupByCreatedAt(uid, from, to, loc)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	response.OK(c, "ok", groups)
+}
+
+func parseDateQuery(c *gin.Context, key string, loc *time.Location) (time.Time, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		response.Error(c, http.StatusBadRequest, key+" is required")
+		return time.Time{}, false
+	}
+	d, err := time.ParseInLocation("2006-01-02", raw, loc)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid "+key)
+		return time.Time{}, false
+	}
+	return d, true
 }
 
 func (h *Handler) FindGroupByDeadline(c *gin.Context) {

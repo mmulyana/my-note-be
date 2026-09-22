@@ -22,7 +22,7 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, search string, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
 	search = strings.TrimSpace(search)
@@ -50,6 +50,13 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		if pinned != nil {
 			db = db.Where("notes.pinned = ?", *pinned)
 		}
+		if hasTodo != nil {
+			if *hasTodo {
+				db = db.Where("notes.todo_total > 0")
+			} else {
+				db = db.Where("notes.todo_total = 0")
+			}
+		}
 		if search != "" {
 			pattern := "%" + search + "%"
 			db = db.Where("notes.title ILIKE ? OR notes.text ILIKE ?", pattern, pattern)
@@ -67,13 +74,21 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 
 	offset := (page - 1) * limit
 
-	var notes []Note
-	err := s.db.
+	dataQ := s.db.
 		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at").
 		Preload("Labels").
 		Preload("Folder").
 		Where("notes.user_id = ?", userID).
-		Scopes(filters).
+		Scopes(filters)
+
+	if hasTodo != nil && *hasTodo {
+		dataQ = dataQ.Preload("Todos", func(db *gorm.DB) *gorm.DB {
+			return db.Order("todos.created_at ASC")
+		})
+	}
+
+	var notes []Note
+	err := dataQ.
 		Order("notes.created_at DESC").
 		Offset(offset).
 		Limit(limit).

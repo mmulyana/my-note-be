@@ -32,6 +32,7 @@ type NoteListItemResponse struct {
 	Title       string          `json:"title"`
 	Preview     string          `json:"preview"`
 	TodoSummary TodoSummary     `json:"todoSummary"`
+	Todos       []TodoResponse  `json:"todos,omitempty"`
 	Labels      []LabelResponse `json:"labels"`
 	Folder      *FolderResponse `json:"folder"`
 	Pinned      bool            `json:"pinned"`
@@ -50,6 +51,13 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 	for i, l := range n.Labels {
 		lbls[i] = LabelResponse{ID: l.ID, Name: l.Name}
 	}
+	var todos []TodoResponse
+	if len(n.Todos) > 0 {
+		todos = make([]TodoResponse, len(n.Todos))
+		for i, t := range n.Todos {
+			todos[i] = toTodoResponse(t)
+		}
+	}
 	return NoteListItemResponse{
 		ID:      n.ID,
 		Title:   n.Title,
@@ -58,6 +66,7 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 			Total: n.TodoTotal,
 			Done:  n.TodoDone,
 		},
+		Todos:     todos,
 		Labels:    lbls,
 		Folder:    toFolderResponse(n.Folder),
 		Pinned:    n.Pinned,

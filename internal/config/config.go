@@ -12,6 +12,8 @@ type Config struct {
 	JWTSecret       string
 	RelayHubBaseURL string
 	RelayHubToken   string
+	// note: allowlist of who can author release notes; unset means nobody can
+	AdminEmails []string
 }
 
 func Load() *Config {
@@ -35,6 +37,11 @@ func Load() *Config {
 		relayHubBaseURL = "http://localhost:8080"
 	}
 
+	var adminEmails []string
+	if raw := os.Getenv("ADMIN_EMAILS"); raw != "" {
+		adminEmails = strings.Split(raw, ",")
+	}
+
 	return &Config{
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		Port:            port,
@@ -42,5 +49,6 @@ func Load() *Config {
 		JWTSecret:       jwtSecret,
 		RelayHubBaseURL: relayHubBaseURL,
 		RelayHubToken:   os.Getenv("RELAY_HUB_TOKEN"),
+		AdminEmails:     adminEmails,
 	}
 }

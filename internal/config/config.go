@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,9 @@ type Config struct {
 	JWTSecret       string
 	RelayHubBaseURL string
 	RelayHubToken   string
+	OpenRouterKey   string
+	OpenRouterModel string
+	AIDailyTokens   int
 	// note: allowlist of who can author release notes; unset means nobody can
 	AdminEmails []string
 }
@@ -37,6 +41,13 @@ func Load() *Config {
 		relayHubBaseURL = "http://localhost:8080"
 	}
 
+	aiDailyTokens := 200000
+	if raw := os.Getenv("AI_DAILY_TOKEN_LIMIT"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			aiDailyTokens = n
+		}
+	}
+
 	var adminEmails []string
 	if raw := os.Getenv("ADMIN_EMAILS"); raw != "" {
 		adminEmails = strings.Split(raw, ",")
@@ -49,6 +60,9 @@ func Load() *Config {
 		JWTSecret:       jwtSecret,
 		RelayHubBaseURL: relayHubBaseURL,
 		RelayHubToken:   os.Getenv("RELAY_HUB_TOKEN"),
+		OpenRouterKey:   os.Getenv("OPENROUTER_API_KEY"),
+		OpenRouterModel: os.Getenv("OPENROUTER_MODEL"),
+		AIDailyTokens:   aiDailyTokens,
 		AdminEmails:     adminEmails,
 	}
 }

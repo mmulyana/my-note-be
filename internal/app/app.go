@@ -4,6 +4,7 @@ import (
 	"my-note-be/internal/config"
 	"my-note-be/internal/database"
 	"my-note-be/internal/middleware"
+	"my-note-be/internal/modules/ai"
 	"my-note-be/internal/modules/feedback"
 	"my-note-be/internal/modules/folders"
 	"my-note-be/internal/modules/labels"
@@ -50,6 +51,11 @@ func Run() {
 	links.RegisterRoutes(protected, db)
 	releases.RegisterRoutes(protected, db, cfg.AdminEmails)
 	uploads.RegisterRoutes(protected)
+	ai.RegisterRoutes(protected, db, ai.Config{
+		APIKey:          cfg.OpenRouterKey,
+		Model:           cfg.OpenRouterModel,
+		DailyTokenLimit: cfg.AIDailyTokens,
+	})
 	feedback.RegisterRoutes(protected, db, feedback.RelayHubConfig{
 		BaseURL: cfg.RelayHubBaseURL,
 		APIKey:  cfg.RelayHubToken,

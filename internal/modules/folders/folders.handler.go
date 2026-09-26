@@ -114,7 +114,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var in FolderInput
+	var in FolderUpdateInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return

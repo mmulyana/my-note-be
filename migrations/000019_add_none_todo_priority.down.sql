@@ -1,0 +1,2 @@
+-- PostgreSQL does not support removing an enum value. The extra value is safe
+-- to retain when rolling back this migration.

@@ -8,6 +8,7 @@ import (
 type Priority string
 
 const (
+	PriorityNone   Priority = "none"
 	PriorityLow    Priority = "low"
 	PriorityMedium Priority = "medium"
 	PriorityHigh   Priority = "high"
@@ -20,7 +21,7 @@ type Todo struct {
 	Checked   bool            `gorm:"not null;default:false" json:"checked"`
 	Deadline  *time.Time      `gorm:"type:date" json:"-"`
 	Today     *time.Time      `gorm:"type:date" json:"-"`
-	Priority  Priority        `gorm:"type:text;not null;default:'medium'" json:"priority"`
+	Priority  Priority        `gorm:"type:text;not null;default:'none'" json:"priority"`
 	Tags      json.RawMessage `gorm:"type:jsonb;not null;default:'[]'" json:"-"`
 	CreatedAt time.Time       `json:"createdAt"`
 	UpdatedAt time.Time       `json:"updatedAt"`

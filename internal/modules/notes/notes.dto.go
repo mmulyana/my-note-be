@@ -27,6 +27,14 @@ type SaveNoteInput struct {
 	Secret   *bool       `json:"secret"`
 }
 
+type CountsResponse struct {
+	Notes   int64            `json:"notes"`
+	Todos   int64            `json:"todos"`
+	Labels  int64            `json:"labels"`
+	Archive int64            `json:"archive"`
+	Folders map[string]int64 `gorm:"-" json:"folders"`
+}
+
 type TodoDiff struct {
 	Added   []TodoInput  `json:"added"`
 	Updated []TodoUpdate `json:"updated"`

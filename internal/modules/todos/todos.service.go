@@ -79,7 +79,7 @@ func (s *Service) Create(userID uuid.UUID, in TodoInput) (*Todo, error) {
 
 	p := in.Priority
 	if p == "" {
-		p = PriorityMedium
+		p = PriorityNone
 	}
 	t := Todo{
 		ID:       in.ID,
@@ -133,12 +133,16 @@ func buildTodoLi(id, text string, checked bool, deadline *string, priority Prior
 	if deadline != nil && *deadline != "" {
 		deadlineAttr = fmt.Sprintf(` data-deadline="%s"`, html.EscapeString(*deadline))
 	}
+	priorityAttr := ""
+	if priority != "" && priority != PriorityNone {
+		priorityAttr = fmt.Sprintf(` data-priority="%s"`, html.EscapeString(string(priority)))
+	}
 	return fmt.Sprintf(
-		`<li data-checked="%s" data-id="%s"%s data-priority="%s" data-type="taskItem"><label><input type="checkbox"%s><span></span></label><div><p>%s</p></div></li>`,
+		`<li data-checked="%s" data-id="%s"%s%s data-type="taskItem"><label><input type="checkbox"%s><span></span></label><div><p>%s</p></div></li>`,
 		checkedAttr,
 		html.EscapeString(id),
 		deadlineAttr,
-		html.EscapeString(string(priority)),
+		priorityAttr,
 		inputCheckedAttr,
 		html.EscapeString(text),
 	)
@@ -188,7 +192,11 @@ func (s *Service) Update(id string, userID uuid.UUID, in TodoUpdateInput) (*Todo
 		fields["today"] = parseDate(in.Today.Value)
 	}
 	if in.Priority != nil {
-		fields["priority"] = *in.Priority
+		priority := *in.Priority
+		if priority == "" {
+			priority = PriorityNone
+		}
+		fields["priority"] = priority
 	}
 	if len(fields) == 0 {
 		return t, nil

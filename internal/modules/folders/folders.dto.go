@@ -7,10 +7,43 @@ import (
 )
 
 type FolderInput struct {
-	Name   string `json:"name" binding:"required"`
-	Color  string `json:"color"`
-	Secret bool   `json:"secret"`
-	Pinned bool   `json:"pinned"`
+	Name     string `json:"name" binding:"required"`
+	Color    string `json:"color"`
+	Secret   bool   `json:"secret"`
+	Pinned   bool   `json:"pinned"`
+	Isolated bool   `json:"isolated"`
+}
+
+type FolderUpdateInput struct {
+	Name     *string `json:"name"`
+	Color    *string `json:"color"`
+	Secret   *bool   `json:"secret"`
+	Pinned   *bool   `json:"pinned"`
+	Isolated *bool   `json:"isolated"`
+}
+
+func (in FolderUpdateInput) ToUpdates() map[string]any {
+	updates := map[string]any{}
+	if in.Name != nil && *in.Name != "" {
+		updates["name"] = *in.Name
+	}
+	if in.Color != nil {
+		color := *in.Color
+		if color == "" {
+			color = "default"
+		}
+		updates["color"] = color
+	}
+	if in.Secret != nil {
+		updates["secret"] = *in.Secret
+	}
+	if in.Pinned != nil {
+		updates["pinned"] = *in.Pinned
+	}
+	if in.Isolated != nil {
+		updates["isolated"] = *in.Isolated
+	}
+	return updates
 }
 
 type FolderResponse struct {
@@ -19,6 +52,7 @@ type FolderResponse struct {
 	Color     string    `json:"color"`
 	Secret    bool      `json:"secret"`
 	Pinned    bool      `json:"pinned"`
+	Isolated  bool      `json:"isolated"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -28,7 +62,7 @@ func (in FolderInput) ToModel(userID uuid.UUID) Folder {
 	if color == "" {
 		color = "default"
 	}
-	return Folder{UserID: userID, Name: in.Name, Color: color, Secret: in.Secret, Pinned: in.Pinned}
+	return Folder{UserID: userID, Name: in.Name, Color: color, Secret: in.Secret, Pinned: in.Pinned, Isolated: in.Isolated}
 }
 
 func ToResponse(f Folder) FolderResponse {
@@ -38,6 +72,7 @@ func ToResponse(f Folder) FolderResponse {
 		Color:     f.Color,
 		Secret:    f.Secret,
 		Pinned:    f.Pinned,
+		Isolated:  f.Isolated,
 		CreatedAt: f.CreatedAt,
 		UpdatedAt: f.UpdatedAt,
 	}

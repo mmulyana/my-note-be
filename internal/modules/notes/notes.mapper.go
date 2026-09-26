@@ -134,11 +134,15 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 }
 
 func toTodoResponse(t Todo) TodoResponse {
+	priority := t.Priority
+	if priority == PriorityNone {
+		priority = ""
+	}
 	res := TodoResponse{
 		ID:       t.ID,
 		Checked:  t.Checked,
 		Text:     t.Text,
-		Priority: t.Priority,
+		Priority: priority,
 	}
 	if t.Deadline != nil {
 		d := t.Deadline.Format("2006-01-02")

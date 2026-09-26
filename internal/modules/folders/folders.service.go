@@ -43,21 +43,16 @@ func (s *Service) Create(userID uuid.UUID, in FolderInput) (*Folder, error) {
 	return &f, nil
 }
 
-func (s *Service) Update(id uuid.UUID, userID uuid.UUID, in FolderInput) (*Folder, error) {
+func (s *Service) Update(id uuid.UUID, userID uuid.UUID, in FolderUpdateInput) (*Folder, error) {
 	var f Folder
 	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&f).Error; err != nil {
 		return nil, err
 	}
-	color := in.Color
-	if color == "" {
-		color = "default"
+	updates := in.ToUpdates()
+	if len(updates) == 0 {
+		return &f, nil
 	}
-	if err := s.db.Model(&f).Updates(map[string]any{
-		"name":   in.Name,
-		"color":  color,
-		"secret": in.Secret,
-		"pinned": in.Pinned,
-	}).Error; err != nil {
+	if err := s.db.Model(&f).Updates(updates).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateName
 		}

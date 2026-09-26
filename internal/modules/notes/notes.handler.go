@@ -106,6 +106,20 @@ func (h *Handler) FindAll(c *gin.Context) {
 	response.OKPaginated(c, "ok", ToListItemResponses(notes), page, limit, total)
 }
 
+func (h *Handler) Counts(c *gin.Context) {
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	counts, err := h.service.Counts(uid)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.OK(c, "ok", counts)
+}
+
 func (h *Handler) FindOne(c *gin.Context) {
 	id := c.Param("id")
 	uid, ok := helpers.ParseUserID(c)

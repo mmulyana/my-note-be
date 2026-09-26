@@ -1,6 +1,7 @@
 package notes
 
 import (
+	"database/sql"
 	"encoding/json"
 	"regexp"
 	"strings"
@@ -22,6 +23,13 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
+func orderTodosByContent(db *gorm.DB) *gorm.DB {
+	return db.
+		Order(`NULLIF(strpos((SELECT content FROM notes WHERE notes.id = todos.note_id), 'data-id="' || todos.id || '"'), 0) ASC NULLS LAST`).
+		Order("todos.created_at ASC").
+		Order("todos.id ASC")
+}
+
 func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
@@ -34,6 +42,8 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		}
 		if folderID != nil {
 			db = db.Where("notes.folder_id = ?", *folderID)
+		} else {
+			db = db.Where("(notes.folder_id IS NULL OR notes.folder_id NOT IN (SELECT id FROM folders WHERE isolated = true AND deleted_at IS NULL))")
 		}
 		if hasFolder != nil {
 			if *hasFolder {
@@ -82,9 +92,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		Scopes(filters)
 
 	if hasTodo != nil && *hasTodo {
-		dataQ = dataQ.Preload("Todos", func(db *gorm.DB) *gorm.DB {
-			return db.Order("todos.created_at ASC")
-		})
+		dataQ = dataQ.Preload("Todos", orderTodosByContent)
 	}
 
 	var notes []Note
@@ -97,10 +105,45 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 	return notes, total, err
 }
 
+func (s *Service) Counts(userID uuid.UUID) (CountsResponse, error) {
+	var out CountsResponse
+	err := s.db.Raw(`
+		SELECT
+			(SELECT COUNT(*) FROM notes WHERE user_id = @uid AND archived = false
+				AND (folder_id IS NULL OR folder_id NOT IN (SELECT id FROM folders WHERE isolated = true AND deleted_at IS NULL))) AS notes,
+			(SELECT COUNT(*) FROM notes WHERE user_id = @uid AND archived = true) AS archive,
+			(SELECT COUNT(*) FROM todos t JOIN notes n ON n.id = t.note_id
+				WHERE n.user_id = @uid AND n.archived = false AND t.checked = false) AS todos,
+			(SELECT COUNT(*) FROM labels WHERE user_id = @uid) AS labels
+	`, sql.Named("uid", userID)).Scan(&out).Error
+	if err != nil {
+		return out, err
+	}
+
+	var rows []struct {
+		FolderID uuid.UUID `gorm:"column:folder_id"`
+		Total    int64     `gorm:"column:total"`
+	}
+	if err := s.db.Raw(`
+		SELECT folder_id, COUNT(*) AS total
+		FROM notes
+		WHERE user_id = ? AND archived = false AND folder_id IS NOT NULL
+		GROUP BY folder_id
+	`, userID).Scan(&rows).Error; err != nil {
+		return out, err
+	}
+
+	out.Folders = make(map[string]int64, len(rows))
+	for _, r := range rows {
+		out.Folders[r.FolderID.String()] = r.Total
+	}
+	return out, nil
+}
+
 func (s *Service) FindOne(id string, userID uuid.UUID) (*Note, error) {
 	var note Note
 	if err := s.db.
-		Preload("Todos").
+		Preload("Todos", orderTodosByContent).
 		Preload("Labels").
 		Preload("Folder").
 		First(&note, "id = ? AND user_id = ?", id, userID).Error; err != nil {
@@ -140,7 +183,7 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 		for _, a := range diff.Added {
 			p := a.Priority
 			if p == "" {
-				p = PriorityMedium
+				p = PriorityNone
 			}
 			todo := Todo{
 				ID:       a.ID,
@@ -235,7 +278,7 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 		for _, a := range diff.Added {
 			p := a.Priority
 			if p == "" {
-				p = PriorityMedium
+				p = PriorityNone
 			}
 			todo := Todo{
 				ID:       a.ID,
@@ -408,6 +451,9 @@ func buildUpdateMap(fields map[string]json.RawMessage) map[string]any {
 	if raw, ok := fields["priority"]; ok {
 		var v string
 		if json.Unmarshal(raw, &v) == nil {
+			if v == "" {
+				v = string(PriorityNone)
+			}
 			out["priority"] = v
 		}
 	}

@@ -1,12 +1,16 @@
 package todos
 
 func ToResponse(t Todo) TodoResponse {
+	priority := t.Priority
+	if priority == PriorityNone {
+		priority = ""
+	}
 	res := TodoResponse{
 		ID:        t.ID,
 		NoteID:    t.NoteID,
 		Text:      t.Text,
 		Checked:   t.Checked,
-		Priority:  t.Priority,
+		Priority:  priority,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
 	}

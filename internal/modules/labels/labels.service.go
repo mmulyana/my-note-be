@@ -19,18 +19,45 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) FindAll(userID uuid.UUID) ([]Label, error) {
-	var labels []Label
-	err := s.db.Where("user_id = ?", userID).Order("name").Find(&labels).Error
-	return labels, err
+type LabelWithCount struct {
+	Label
+	NoteCount int64
 }
 
-func (s *Service) FindOne(id uuid.UUID, userID uuid.UUID) (*Label, error) {
-	var l Label
-	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&l).Error; err != nil {
+// note: counts every note using the label (archived included), except notes hidden in isolated folders like the notes list does
+func (s *Service) withCount(userID uuid.UUID, id *uuid.UUID) ([]LabelWithCount, error) {
+	query := `
+		SELECT l.id, l.user_id, l.name, COUNT(n.id) AS note_count
+		FROM labels l
+		LEFT JOIN note_labels nl ON nl.label_id = l.id
+		LEFT JOIN notes n ON n.id = nl.note_id
+			AND (n.folder_id IS NULL OR n.folder_id NOT IN (SELECT id FROM folders WHERE isolated = true AND deleted_at IS NULL))
+		WHERE l.user_id = ?`
+	args := []any{userID}
+	if id != nil {
+		query += " AND l.id = ?"
+		args = append(args, *id)
+	}
+	query += " GROUP BY l.id ORDER BY l.name"
+
+	var rows []LabelWithCount
+	err := s.db.Raw(query, args...).Scan(&rows).Error
+	return rows, err
+}
+
+func (s *Service) FindAll(userID uuid.UUID) ([]LabelWithCount, error) {
+	return s.withCount(userID, nil)
+}
+
+func (s *Service) FindOne(id uuid.UUID, userID uuid.UUID) (*LabelWithCount, error) {
+	rows, err := s.withCount(userID, &id)
+	if err != nil {
 		return nil, err
 	}
-	return &l, nil
+	if len(rows) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &rows[0], nil
 }
 
 func normalizeNames(names []string) []string {
@@ -92,18 +119,6 @@ func ResolveByNames(tx *gorm.DB, userID uuid.UUID, names []string) ([]Label, err
 		labels = append(labels, *label)
 	}
 	return labels, nil
-}
-
-func IDsByNames(tx *gorm.DB, userID uuid.UUID, names []string) ([]string, error) {
-	normalizedNames := normalizeNames(names)
-	if len(normalizedNames) == 0 {
-		return nil, nil
-	}
-	var ids []string
-	err := tx.Model(&Label{}).
-		Where("user_id = ? AND lower(name) IN ?", userID, normalizedNames).
-		Pluck("id", &ids).Error
-	return ids, err
 }
 
 func DeleteUnused(tx *gorm.DB, userID uuid.UUID, ids []string) error {

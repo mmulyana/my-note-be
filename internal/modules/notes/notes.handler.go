@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"my-note-be/internal/helpers"
 	"my-note-be/internal/response"
@@ -98,12 +100,86 @@ func (h *Handler) FindAll(c *gin.Context) {
 
 	search := c.Query("q")
 
-	notes, total, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, search, page, limit)
+	tf, err := parseTodoFilter(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	notes, total, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, tf, search, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	response.OKPaginated(c, "ok", ToListItemResponses(notes), page, limit, total)
+}
+
+func parseTodoFilter(c *gin.Context) (TodoFilter, error) {
+	tf := TodoFilter{Desc: true}
+
+	for _, raw := range splitCSV(c.Query("folderIds")) {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return tf, errors.New("invalid folderIds")
+		}
+		tf.FolderIDs = append(tf.FolderIDs, id)
+	}
+
+	if v, err := strconv.ParseBool(c.Query("noFolder")); err == nil {
+		tf.NoFolder = v
+	}
+
+	for _, raw := range splitCSV(c.Query("todoPriority")) {
+		switch p := TodoPriority(raw); p {
+		case PriorityNone, PriorityLow, PriorityMedium, PriorityHigh:
+			tf.Priorities = append(tf.Priorities, p)
+		default:
+			return tf, errors.New("invalid todoPriority")
+		}
+	}
+
+	switch s := c.Query("todoStatus"); s {
+	case "", TodoStatusOverdue, TodoStatusOpen, TodoStatusDone:
+		tf.Status = s
+	default:
+		return tf, errors.New("invalid todoStatus")
+	}
+
+	switch s := c.Query("sort"); s {
+	case "", TodoSortPriority, TodoSortOverdue, TodoSortUpdated:
+		tf.Sort = s
+	default:
+		return tf, errors.New("invalid sort")
+	}
+
+	switch c.Query("order") {
+	case "", "desc":
+	case "asc":
+		tf.Desc = false
+	default:
+		return tf, errors.New("invalid order")
+	}
+
+	tf.Today = time.Now().UTC()
+	if raw := c.Query("date"); raw != "" {
+		d, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			return tf, errors.New("invalid date")
+		}
+		tf.Today = d
+	}
+
+	return tf, nil
+}
+
+func splitCSV(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func (h *Handler) Counts(c *gin.Context) {

@@ -32,7 +32,7 @@ func orderTodosByContent(db *gorm.DB) *gorm.DB {
 		Order("todos.id ASC")
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, search string, page, limit int) ([]Note, int64, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, tf TodoFilter, search string, page, limit int) ([]Note, int64, error) {
 	var total int64
 
 	search = strings.TrimSpace(search)
@@ -54,9 +54,19 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 				db = db.Where("notes.folder_id IS NULL")
 			}
 		}
+		if tf.hasFolderFilter() {
+			switch {
+			case len(tf.FolderIDs) > 0 && tf.NoFolder:
+				db = db.Where("(notes.folder_id IN ? OR notes.folder_id IS NULL)", tf.FolderIDs)
+			case len(tf.FolderIDs) > 0:
+				db = db.Where("notes.folder_id IN ?", tf.FolderIDs)
+			default:
+				db = db.Where("notes.folder_id IS NULL")
+			}
+		}
 		if archived != nil {
 			db = db.Where("notes.archived = ?", *archived)
-		} else {
+		} else if labelID == nil {
 			db = db.Where("notes.archived = false")
 		}
 		if pinned != nil {
@@ -67,6 +77,11 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 				db = db.Where("notes.todo_total > 0")
 			} else {
 				db = db.Where("notes.todo_total = 0")
+			}
+		}
+		if hasTodo != nil && *hasTodo {
+			if exists := tf.existsSQL(); exists != "" {
+				db = db.Where(exists)
 			}
 		}
 		if search != "" {
@@ -94,10 +109,15 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		Scopes(filters)
 
 	if hasTodo != nil && *hasTodo {
-		dataQ = dataQ.Preload("Todos", orderTodosByContent)
+		dataQ = dataQ.Preload("Todos", tf.preloadScope)
 	}
 
 	var notes []Note
+	if hasTodo != nil && *hasTodo {
+		if order := tf.noteOrderSQL(); order != "" {
+			dataQ = dataQ.Order(order)
+		}
+	}
 	err := dataQ.
 		Order("notes.created_at DESC").
 		Offset(offset).
@@ -168,7 +188,7 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 			return err
 		}
 
-		if err := applyLabelDiff(tx, note.ID, userID, in.LabelDiff); err != nil {
+		if err := syncLabels(tx, note.ID, userID, in.Labels); err != nil {
 			return err
 		}
 
@@ -258,7 +278,7 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			return err
 		}
 
-		if err := applyLabelDiff(tx, id, userID, in.LabelDiff); err != nil {
+		if err := syncLabels(tx, id, userID, in.Labels); err != nil {
 			return err
 		}
 
@@ -339,34 +359,47 @@ func (s *Service) Remove(id string, userID uuid.UUID) error {
 	})
 }
 
-func applyLabelDiff(tx *gorm.DB, noteID string, userID uuid.UUID, diff LabelDiff) error {
-	if len(diff.Removed) > 0 {
-		removedLabelIDs, err := labels.IDsByNames(tx, userID, diff.Removed)
-		if err != nil {
-			return err
-		}
-		if len(removedLabelIDs) > 0 {
-			if err := tx.Exec("DELETE FROM note_labels WHERE note_id = ? AND label_id IN ?", noteID, removedLabelIDs).Error; err != nil {
-				return err
-			}
-			if err := labels.DeleteUnused(tx, userID, removedLabelIDs); err != nil {
-				return err
-			}
+// note: nil names = request did not carry labels, leave the note's labels untouched; empty = clear them all
+func syncLabels(tx *gorm.DB, noteID string, userID uuid.UUID, names []string) error {
+	if names == nil {
+		return nil
+	}
+
+	wanted, err := labels.ResolveByNames(tx, userID, names)
+	if err != nil {
+		return err
+	}
+	keep := make(map[string]bool, len(wanted))
+	for _, label := range wanted {
+		keep[label.ID.String()] = true
+	}
+
+	var current []string
+	if err := tx.Table("note_labels").Where("note_id = ?", noteID).Pluck("label_id", &current).Error; err != nil {
+		return err
+	}
+	var stale []string
+	for _, id := range current {
+		if !keep[id] {
+			stale = append(stale, id)
 		}
 	}
 
-	if len(diff.Added) > 0 {
-		addedLabels, err := labels.ResolveByNames(tx, userID, diff.Added)
-		if err != nil {
+	if len(stale) > 0 {
+		if err := tx.Exec("DELETE FROM note_labels WHERE note_id = ? AND label_id IN ?", noteID, stale).Error; err != nil {
 			return err
 		}
-		for _, label := range addedLabels {
-			if err := tx.Exec(
-				"INSERT INTO note_labels (note_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-				noteID, label.ID,
-			).Error; err != nil {
-				return err
-			}
+		if err := labels.DeleteUnused(tx, userID, stale); err != nil {
+			return err
+		}
+	}
+
+	for _, label := range wanted {
+		if err := tx.Exec(
+			"INSERT INTO note_labels (note_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+			noteID, label.ID,
+		).Error; err != nil {
+			return err
 		}
 	}
 

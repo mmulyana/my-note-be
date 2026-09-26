@@ -1,13 +1,14 @@
 package labels
 
-func ToResponse(l Label) LabelResponse {
+func ToResponse(l LabelWithCount) LabelResponse {
 	res := LabelResponse{}
 	res.ID = l.ID.String()
 	res.Name = l.Name
+	res.NoteCount = l.NoteCount
 	return res
 }
 
-func ToResponses(labels []Label) []LabelResponse {
+func ToResponses(labels []LabelWithCount) []LabelResponse {
 	out := make([]LabelResponse, len(labels))
 	for i, l := range labels {
 		out[i] = ToResponse(l)

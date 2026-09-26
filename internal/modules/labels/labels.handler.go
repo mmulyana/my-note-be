@@ -52,66 +52,6 @@ func (h *Handler) FindOne(c *gin.Context) {
 	response.OK(c, "ok", ToResponse(*label))
 }
 
-func (h *Handler) Create(c *gin.Context) {
-	var in LabelInput
-	if err := c.ShouldBindJSON(&in); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-	uid, ok := helpers.ParseUserID(c)
-	if !ok {
-		return
-	}
-
-	label, err := h.service.Create(uid, in)
-	if err != nil {
-		respondLookupError(c, err)
-		return
-	}
-	response.Created(c, "created", ToResponse(*label))
-}
-
-func (h *Handler) Update(c *gin.Context) {
-	id, ok := parseID(c)
-	if !ok {
-		return
-	}
-	uid, ok := helpers.ParseUserID(c)
-	if !ok {
-		return
-	}
-
-	var in LabelInput
-	if err := c.ShouldBindJSON(&in); err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	label, err := h.service.Update(id, uid, in)
-	if err != nil {
-		respondLookupError(c, err)
-		return
-	}
-	response.OK(c, "updated", ToResponse(*label))
-}
-
-func (h *Handler) Remove(c *gin.Context) {
-	id, ok := parseID(c)
-	if !ok {
-		return
-	}
-	uid, ok := helpers.ParseUserID(c)
-	if !ok {
-		return
-	}
-
-	if err := h.service.Remove(id, uid); err != nil {
-		respondLookupError(c, err)
-		return
-	}
-	response.OK(c, "deleted", nil)
-}
-
 func parseID(c *gin.Context) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -122,12 +62,9 @@ func parseID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 func respondLookupError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound):
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		response.Error(c, http.StatusNotFound, "label not found")
-	case errors.Is(err, ErrDuplicateName):
-		response.Error(c, http.StatusConflict, err.Error())
-	default:
-		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
 	}
+	response.Error(c, http.StatusInternalServerError, err.Error())
 }

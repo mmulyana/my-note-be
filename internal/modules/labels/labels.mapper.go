@@ -1,15 +1,5 @@
 package labels
 
-import (
-	"strings"
-
-	"github.com/google/uuid"
-)
-
-func (in LabelInput) ToModel(userID uuid.UUID) Label {
-	return Label{UserID: userID, Name: strings.TrimSpace(in.Name)}
-}
-
 func ToResponse(l Label) LabelResponse {
 	res := LabelResponse{}
 	res.ID = l.ID.String()

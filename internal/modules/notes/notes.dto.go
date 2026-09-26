@@ -7,24 +7,29 @@ import (
 )
 
 type CreateNoteInput struct {
-	ID       string      `json:"id" binding:"required"`
-	Content  string      `json:"content"`
-	TodoDiff TodoDiff    `json:"todoDiff"`
-	LinkDiff LinkDiff    `json:"linkDiff"`
-	LabelIDs []uuid.UUID `json:"labelIds"`
-	FolderID *uuid.UUID  `json:"folderId"`
+	ID        string     `json:"id" binding:"required"`
+	Content   string     `json:"content"`
+	TodoDiff  TodoDiff   `json:"todoDiff"`
+	LinkDiff  LinkDiff   `json:"linkDiff"`
+	LabelDiff LabelDiff  `json:"labelDiff"`
+	FolderID  *uuid.UUID `json:"folderId"`
 }
 
 type SaveNoteInput struct {
-	Content  string      `json:"content" binding:"required"`
-	Preview  string      `json:"preview"`
-	TodoDiff TodoDiff    `json:"todoDiff"`
-	LinkDiff LinkDiff    `json:"linkDiff"`
-	LabelIDs []uuid.UUID `json:"labelIds"`
-	FolderID *uuid.UUID  `json:"folderId"`
-	Pinned   *bool       `json:"pinned"`
-	Archived *bool       `json:"archived"`
-	Secret   *bool       `json:"secret"`
+	Content   string     `json:"content" binding:"required"`
+	Preview   string     `json:"preview"`
+	TodoDiff  TodoDiff   `json:"todoDiff"`
+	LinkDiff  LinkDiff   `json:"linkDiff"`
+	LabelDiff LabelDiff  `json:"labelDiff"`
+	FolderID  *uuid.UUID `json:"folderId"`
+	Pinned    *bool      `json:"pinned"`
+	Archived  *bool      `json:"archived"`
+	Secret    *bool      `json:"secret"`
+}
+
+type LabelDiff struct {
+	Added   []string `json:"added"`
+	Removed []string `json:"removed"`
 }
 
 type CountsResponse struct {

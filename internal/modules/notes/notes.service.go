@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"my-note-be/internal/modules/labels"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -166,10 +168,8 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 			return err
 		}
 
-		for _, labelID := range in.LabelIDs {
-			if err := tx.Exec("INSERT INTO note_labels (note_id, label_id) VALUES (?, ?)", note.ID, labelID).Error; err != nil {
-				return err
-			}
+		if err := applyLabelDiff(tx, note.ID, userID, in.LabelDiff); err != nil {
+			return err
 		}
 
 		diff := in.TodoDiff
@@ -258,13 +258,8 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			return err
 		}
 
-		if err := tx.Exec("DELETE FROM note_labels WHERE note_id = ?", id).Error; err != nil {
+		if err := applyLabelDiff(tx, id, userID, in.LabelDiff); err != nil {
 			return err
-		}
-		for _, labelID := range in.LabelIDs {
-			if err := tx.Exec("INSERT INTO note_labels (note_id, label_id) VALUES (?, ?)", id, labelID).Error; err != nil {
-				return err
-			}
 		}
 
 		diff := in.TodoDiff
@@ -327,13 +322,54 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 }
 
 func (s *Service) Remove(id string, userID uuid.UUID) error {
-	res := s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&Note{})
-	if res.Error != nil {
-		return res.Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var labelIDs []string
+		if err := tx.Table("note_labels").Where("note_id = ?", id).Pluck("label_id", &labelIDs).Error; err != nil {
+			return err
+		}
+
+		res := tx.Where("id = ? AND user_id = ?", id, userID).Delete(&Note{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return labels.DeleteUnused(tx, userID, labelIDs)
+	})
+}
+
+func applyLabelDiff(tx *gorm.DB, noteID string, userID uuid.UUID, diff LabelDiff) error {
+	if len(diff.Removed) > 0 {
+		removedLabelIDs, err := labels.IDsByNames(tx, userID, diff.Removed)
+		if err != nil {
+			return err
+		}
+		if len(removedLabelIDs) > 0 {
+			if err := tx.Exec("DELETE FROM note_labels WHERE note_id = ? AND label_id IN ?", noteID, removedLabelIDs).Error; err != nil {
+				return err
+			}
+			if err := labels.DeleteUnused(tx, userID, removedLabelIDs); err != nil {
+				return err
+			}
+		}
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+
+	if len(diff.Added) > 0 {
+		addedLabels, err := labels.ResolveByNames(tx, userID, diff.Added)
+		if err != nil {
+			return err
+		}
+		for _, label := range addedLabels {
+			if err := tx.Exec(
+				"INSERT INTO note_labels (note_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+				noteID, label.ID,
+			).Error; err != nil {
+				return err
+			}
+		}
 	}
+
 	return nil
 }
 

@@ -32,9 +32,7 @@ func orderTodosByContent(db *gorm.DB) *gorm.DB {
 		Order("todos.id ASC")
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, tf TodoFilter, search string, page, limit int) ([]Note, int64, error) {
-	var total int64
-
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, tf TodoFilter, search string, lastID string, limit int) ([]Note, error) {
 	search = strings.TrimSpace(search)
 
 	filters := func(db *gorm.DB) *gorm.DB {
@@ -91,16 +89,6 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		return db
 	}
 
-	q := s.db.Model(&Note{}).
-		Where("notes.user_id = ?", userID).
-		Scopes(filters)
-
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	offset := (page - 1) * limit
-
 	dataQ := s.db.
 		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at").
 		Preload("Labels").
@@ -112,19 +100,29 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 		dataQ = dataQ.Preload("Todos", tf.preloadScope)
 	}
 
-	var notes []Note
+	var todoOrder string
 	if hasTodo != nil && *hasTodo {
-		if order := tf.noteOrderSQL(); order != "" {
-			dataQ = dataQ.Order(order)
-		}
+		todoOrder = tf.noteOrderSQL()
 	}
+
+	if todoOrder != "" {
+		dataQ = dataQ.Order(todoOrder)
+	} else if lastID != "" {
+		// note: keyset from the last note the client holds; unknown lastID matches nothing
+		dataQ = dataQ.Where(
+			"(notes.created_at, notes.id) < (SELECT c.created_at, c.id FROM notes c WHERE c.id = ? AND c.user_id = ?)",
+			lastID, userID,
+		)
+	}
+
+	var notes []Note
 	err := dataQ.
 		Order("notes.created_at DESC").
-		Offset(offset).
+		Order("notes.id DESC").
 		Limit(limit).
 		Find(&notes).Error
 
-	return notes, total, err
+	return notes, err
 }
 
 func (s *Service) Counts(userID uuid.UUID) (CountsResponse, error) {

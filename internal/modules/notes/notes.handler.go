@@ -81,13 +81,6 @@ func (h *Handler) FindAll(c *gin.Context) {
 		}
 	}
 
-	page := 1
-	if raw := c.Query("page"); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
-			page = v
-		}
-	}
-
 	limit := 50
 	if raw := c.Query("limit"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
@@ -106,12 +99,13 @@ func (h *Handler) FindAll(c *gin.Context) {
 		return
 	}
 
-	notes, total, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, tf, search, page, limit)
+	// note: cursor = id of the last note the client already has; client stops when a page returns < limit
+	notes, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, tf, search, c.Query("lastId"), limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response.OKPaginated(c, "ok", ToListItemResponses(notes), page, limit, total)
+	response.OK(c, "ok", ToListItemResponses(notes))
 }
 
 func parseTodoFilter(c *gin.Context) (TodoFilter, error) {

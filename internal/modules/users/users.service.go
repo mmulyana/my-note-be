@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	ErrEmailTaken = errors.New("email already exists")
-	ErrNotGuest   = errors.New("account is not a guest")
+	ErrEmailTaken           = errors.New("email already exists")
+	ErrNotGuest             = errors.New("account is not a guest")
+	ErrIsGuest              = errors.New("guest accounts have no password; save your account first")
+	ErrCurrentPasswordWrong = errors.New("current password is incorrect")
 )
 
 type Service struct {
@@ -133,6 +135,28 @@ func (s *Service) UpdateProfile(id string, in UpdateProfileInput) (*User, error)
 		return nil, err
 	}
 	return s.FindByID(id)
+}
+
+func (s *Service) ChangePassword(id, currentPassword, newPassword string) error {
+	user, err := s.FindByID(id)
+	if err != nil {
+		return err
+	}
+
+	if user.IsGuest || user.Password == nil {
+		return ErrIsGuest
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(currentPassword)); err != nil {
+		return ErrCurrentPasswordWrong
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Model(&User{}).Where("id = ?", id).Update("password", string(hashedPassword)).Error
 }
 
 func (s *Service) CreateRefreshToken(userID uuid.UUID, ttl time.Duration) (string, error) {

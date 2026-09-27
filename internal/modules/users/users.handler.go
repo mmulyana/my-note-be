@@ -199,3 +199,27 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 
 	response.OK(c, "updated", ToProfileResponse(updated))
 }
+
+func (h *Handler) ChangePassword(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var in ChangePasswordInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.ChangePassword(userID, in.CurrentPassword, in.NewPassword); err != nil {
+		switch {
+		case errors.Is(err, ErrIsGuest):
+			response.Error(c, http.StatusConflict, err.Error())
+		case errors.Is(err, ErrCurrentPasswordWrong):
+			response.Error(c, http.StatusBadRequest, err.Error())
+		default:
+			response.Error(c, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
+	response.OK(c, "password changed", nil)
+}

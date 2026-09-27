@@ -15,6 +15,7 @@ type TokenResponse struct {
 	RefreshToken string `json:"refreshToken"`
 	ExpiresAt    int64  `json:"expiresAt"`
 	Email        string `json:"email,omitempty"`
+	IsGuest      bool   `json:"isGuest"`
 }
 
 type RefreshTokenInput struct {
@@ -28,7 +29,8 @@ type UpdateProfileInput struct {
 
 type ProfileResponse struct {
 	ID       string  `json:"id"`
-	Email    string  `json:"email"`
+	Email    *string `json:"email"`
 	Username *string `json:"username"`
 	Photo    *string `json:"photo"`
+	IsGuest  bool    `json:"isGuest"`
 }

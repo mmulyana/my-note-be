@@ -22,9 +22,10 @@ var (
 )
 
 type Config struct {
-	APIKey          string
-	Model           string
-	DailyTokenLimit int
+	APIKey               string
+	Model                string
+	DailyTokenLimit      int
+	GuestDailyTokenLimit int
 }
 
 type Service struct {

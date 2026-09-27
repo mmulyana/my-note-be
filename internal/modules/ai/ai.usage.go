@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	defaultDailyTokens = 200000
-	charsPerToken      = 4
+	defaultDailyTokens      = 50000
+	defaultGuestDailyTokens = 5000
+	charsPerToken           = 4
 )
 
 var (
@@ -28,6 +29,15 @@ func usageDay(now time.Time) (day string, resetsIn time.Duration) {
 	local := now.In(usageZone)
 	next := time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, usageZone)
 	return local.Format("2006-01-02"), next.Sub(local)
+}
+
+func (u *usageStore) isGuest(userID uuid.UUID) (bool, error) {
+	var guest bool
+	err := u.db.Table("users").
+		Select("is_guest").
+		Where("id = ?", userID).
+		Scan(&guest).Error
+	return guest, err
 }
 
 func (u *usageStore) used(userID uuid.UUID, day string) (int64, error) {

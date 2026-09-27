@@ -175,7 +175,10 @@ func (h *Handler) isAdmin(c *gin.Context) bool {
 	if err != nil {
 		return false
 	}
-	_, ok := h.adminEmails[strings.ToLower(user.Email)]
+	if user.Email == nil {
+		return false
+	}
+	_, ok := h.adminEmails[strings.ToLower(*user.Email)]
 	return ok
 }
 

@@ -1,0 +1,6 @@
+DELETE FROM users WHERE is_guest;
+ALTER TABLE users DROP CONSTRAINT users_guest_or_registered_chk;
+ALTER TABLE users ALTER COLUMN created_at SET DEFAULT NOW();
+ALTER TABLE users ALTER COLUMN password SET NOT NULL;
+ALTER TABLE users ALTER COLUMN email SET NOT NULL;
+ALTER TABLE users DROP COLUMN is_guest;

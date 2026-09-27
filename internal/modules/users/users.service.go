@@ -11,6 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	ErrEmailTaken = errors.New("email already exists")
+	ErrNotGuest   = errors.New("account is not a guest")
+)
+
 type Service struct {
 	db *gorm.DB
 }
@@ -22,7 +27,7 @@ func NewService(db *gorm.DB) *Service {
 func (s *Service) Register(email, password string) (*User, error) {
 	var existing User
 	if err := s.db.Where("email = ?", email).First(&existing).Error; err == nil {
-		return nil, errors.New("email already exists")
+		return nil, ErrEmailTaken
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -38,6 +43,52 @@ func (s *Service) Register(email, password string) (*User, error) {
 	return user, nil
 }
 
+func (s *Service) CreateGuest() (*User, error) {
+	user := NewGuestUser()
+	if err := s.db.Create(user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *Service) UpgradeGuest(id, email, password string) (*User, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		var taken int64
+		if err := tx.Model(&User{}).Where("email = ?", email).Count(&taken).Error; err != nil {
+			return err
+		}
+		if taken > 0 {
+			return ErrEmailTaken
+		}
+
+		now := time.Now()
+		res := tx.Model(&User{}).Where("id = ? AND is_guest = ?", id, true).Updates(map[string]any{
+			"email":      email,
+			"password":   string(hashedPassword),
+			"is_guest":   false,
+			"created_at": now,
+			"updated_at": now,
+		})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotGuest
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.FindByID(id)
+}
+
 func (s *Service) Login(email, password string) (*User, error) {
 	var user User
 	if err := s.db.Where("email = ?", email).First(&user).Error; err != nil {
@@ -47,7 +98,11 @@ func (s *Service) Login(email, password string) (*User, error) {
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if user.Password == nil {
+		return nil, errors.New("invalid credentials")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(password)); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -154,4 +209,3 @@ func (s *Service) RevokeRefreshToken(rawToken string) error {
 	tokenHash := middleware.HashToken(rawToken)
 	return s.db.Where("token_hash = ?", tokenHash).Delete(&RefreshToken{}).Error
 }
-

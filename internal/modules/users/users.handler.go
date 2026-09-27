@@ -1,6 +1,7 @@
 package users
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -48,12 +49,52 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, "registered", TokenResponse{
-		AccessToken:  token,
-		RefreshToken: refreshToken,
-		ExpiresAt:    expiresAt,
-		Email:        user.Email,
-	})
+	response.Created(c, "registered", ToTokenResponse(user, token, refreshToken, expiresAt))
+}
+
+func (h *Handler) Guest(c *gin.Context) {
+	user, err := h.service.CreateGuest()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	token, expiresAt, err := middleware.GenerateAccessToken(user.ID.String(), constants.AccessTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	refreshToken, err := h.service.CreateRefreshToken(user.ID, constants.RefreshTokenTTL)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Created(c, "guest created", ToTokenResponse(user, token, refreshToken, expiresAt))
+}
+
+func (h *Handler) UpgradeGuest(c *gin.Context) {
+	var in RegisterInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := h.service.UpgradeGuest(c.GetString("user_id"), in.Email, in.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrNotGuest):
+			response.Error(c, http.StatusConflict, err.Error())
+		case errors.Is(err, ErrEmailTaken):
+			response.Error(c, http.StatusBadRequest, err.Error())
+		default:
+			response.Error(c, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+
+	response.OK(c, "upgraded", ToProfileResponse(user))
 }
 
 func (h *Handler) Login(c *gin.Context) {
@@ -81,12 +122,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, "logged in", TokenResponse{
-		AccessToken:  token,
-		RefreshToken: refreshToken,
-		ExpiresAt:    expiresAt,
-		Email:        user.Email,
-	})
+	response.OK(c, "logged in", ToTokenResponse(user, token, refreshToken, expiresAt))
 }
 
 func (h *Handler) RefreshToken(c *gin.Context) {
@@ -108,12 +144,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, "token refreshed", TokenResponse{
-		AccessToken:  token,
-		RefreshToken: newRefreshToken,
-		ExpiresAt:    expiresAt,
-		Email:        user.Email,
-	})
+	response.OK(c, "token refreshed", ToTokenResponse(user, token, newRefreshToken, expiresAt))
 }
 
 func (h *Handler) Logout(c *gin.Context) {

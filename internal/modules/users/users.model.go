@@ -9,21 +9,38 @@ import (
 
 type User struct {
 	ID        uuid.UUID `gorm:"primaryKey"`
-	Email     string    `gorm:"uniqueIndex"`
-	Password  string
+	Email     *string   `gorm:"uniqueIndex"`
+	Password  *string
 	Username  *string
 	Photo     *string
-	CreatedAt time.Time
+	IsGuest   bool
+	CreatedAt *time.Time `gorm:"autoCreateTime:false"`
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
+func (u *User) EmailOrEmpty() string {
+	if u.Email == nil {
+		return ""
+	}
+	return *u.Email
+}
+
 func NewUser(email, password string) *User {
+	now := time.Now()
 	return &User{
 		ID:        uuid.New(),
-		Email:     email,
-		Password:  password,
-		CreatedAt: time.Now(),
+		Email:     &email,
+		Password:  &password,
+		CreatedAt: &now,
+		UpdatedAt: now,
+	}
+}
+
+func NewGuestUser() *User {
+	return &User{
+		ID:        uuid.New(),
+		IsGuest:   true,
 		UpdatedAt: time.Now(),
 	}
 }
@@ -35,4 +52,3 @@ type RefreshToken struct {
 	ExpiresAt time.Time `gorm:"not null"`
 	CreatedAt time.Time
 }
-

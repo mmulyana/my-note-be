@@ -21,22 +21,38 @@ import (
 const streamTimeout = 2 * time.Minute
 
 type Handler struct {
-	service    *Service
-	limiter    *limiter
-	usage      *usageStore
-	dailyLimit int64
+	service         *Service
+	limiter         *limiter
+	usage           *usageStore
+	dailyLimit      int64
+	guestDailyLimit int64
 }
 
-func NewHandler(service *Service, db *gorm.DB, dailyLimit int) *Handler {
+func NewHandler(service *Service, db *gorm.DB, dailyLimit, guestDailyLimit int) *Handler {
 	if dailyLimit <= 0 {
 		dailyLimit = defaultDailyTokens
 	}
-	return &Handler{
-		service:    service,
-		limiter:    newLimiter(limitRequests, limitWindow),
-		usage:      &usageStore{db: db},
-		dailyLimit: int64(dailyLimit),
+	if guestDailyLimit <= 0 {
+		guestDailyLimit = defaultGuestDailyTokens
 	}
+	return &Handler{
+		service:         service,
+		limiter:         newLimiter(limitRequests, limitWindow),
+		usage:           &usageStore{db: db},
+		dailyLimit:      int64(dailyLimit),
+		guestDailyLimit: int64(guestDailyLimit),
+	}
+}
+
+func (h *Handler) limitFor(userID uuid.UUID) (int64, error) {
+	guest, err := h.usage.isGuest(userID)
+	if err != nil {
+		return 0, err
+	}
+	if guest {
+		return h.guestDailyLimit, nil
+	}
+	return h.dailyLimit, nil
 }
 
 func (h *Handler) record(userID uuid.UUID, day string, messages []message, output string, reported int, canceled bool) {
@@ -58,6 +74,13 @@ func (h *Handler) Usage(c *gin.Context) {
 		return
 	}
 
+	limit, err := h.limitFor(userID)
+	if err != nil {
+		log.Printf("ai: read limit: %v", err)
+		response.Error(c, http.StatusInternalServerError, "failed to read ai usage")
+		return
+	}
+
 	now := time.Now()
 	day, resetsIn := usageDay(now)
 	used, err := h.usage.used(userID, day)
@@ -69,8 +92,8 @@ func (h *Handler) Usage(c *gin.Context) {
 
 	response.OK(c, "ok", gin.H{
 		"used":      used,
-		"limit":     h.dailyLimit,
-		"remaining": max(h.dailyLimit-used, 0),
+		"limit":     limit,
+		"remaining": max(limit-used, 0),
 		"resetsAt":  now.Add(resetsIn).UTC().Format(time.RFC3339),
 	})
 }
@@ -105,6 +128,13 @@ func (h *Handler) Stream(c *gin.Context) {
 	}
 	defer release()
 
+	limit, err := h.limitFor(userID)
+	if err != nil {
+		log.Printf("ai: read limit: %v", err)
+		response.Error(c, http.StatusInternalServerError, "failed to check ai usage")
+		return
+	}
+
 	day, resetsIn := usageDay(time.Now())
 	used, err := h.usage.used(userID, day)
 	if err != nil {
@@ -112,7 +142,7 @@ func (h *Handler) Stream(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "failed to check ai usage")
 		return
 	}
-	if used >= h.dailyLimit {
+	if used >= limit {
 		c.Header("Retry-After", strconv.Itoa(int(math.Ceil(resetsIn.Seconds()))))
 		response.Error(c, http.StatusTooManyRequests, ErrQuotaExceeded.Error())
 		return

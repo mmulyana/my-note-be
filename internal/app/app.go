@@ -52,9 +52,10 @@ func Run() {
 	releases.RegisterRoutes(protected, db, cfg.AdminEmails)
 	uploads.RegisterRoutes(protected)
 	ai.RegisterRoutes(protected, db, ai.Config{
-		APIKey:          cfg.OpenRouterKey,
-		Model:           cfg.OpenRouterModel,
-		DailyTokenLimit: cfg.AIDailyTokens,
+		APIKey:               cfg.OpenRouterKey,
+		Model:                cfg.OpenRouterModel,
+		DailyTokenLimit:      cfg.AIDailyTokens,
+		GuestDailyTokenLimit: cfg.AIGuestDailyTokens,
 	})
 	feedback.RegisterRoutes(protected, db, feedback.RelayHubConfig{
 		BaseURL: cfg.RelayHubBaseURL,

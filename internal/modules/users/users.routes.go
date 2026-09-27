@@ -12,6 +12,7 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	{
 		g.POST("/register", h.Register)
 		g.POST("/login", h.Login)
+		g.POST("/guest", h.Guest)
 		g.POST("/refresh", h.RefreshToken)
 		g.POST("/logout", h.Logout)
 	}
@@ -21,4 +22,5 @@ func RegisterProtectedRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	h := NewHandler(db)
 	r.GET("/me", h.Me)
 	r.PATCH("/me", h.UpdateProfile)
+	r.POST("/auth/guest/upgrade", h.UpgradeGuest)
 }

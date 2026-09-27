@@ -38,12 +38,16 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	reporterName := user.Email
+	email := user.EmailOrEmpty()
+	reporterName := email
 	if user.Username != nil && *user.Username != "" {
 		reporterName = *user.Username
 	}
+	if reporterName == "" {
+		reporterName = "Guest"
+	}
 
-	res, err := h.service.Create(in, reporterName, user.Email, user.ID.String())
+	res, err := h.service.Create(in, reporterName, email, user.ID.String())
 	if err != nil {
 		if errors.Is(err, ErrInvalidType) {
 			response.Error(c, http.StatusBadRequest, "invalid feedback type")

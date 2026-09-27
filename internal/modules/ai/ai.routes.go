@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB, cfg Config) {
-	h := NewHandler(NewService(cfg), db, cfg.DailyTokenLimit)
+	h := NewHandler(NewService(cfg), db, cfg.DailyTokenLimit, cfg.GuestDailyTokenLimit)
 
 	g := r.Group("/ai")
 	{

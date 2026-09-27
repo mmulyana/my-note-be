@@ -22,6 +22,11 @@ type RefreshTokenInput struct {
 	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
+type ChangePasswordInput struct {
+	CurrentPassword string `json:"currentPassword" binding:"required"`
+	NewPassword     string `json:"newPassword" binding:"required,min=6"`
+}
+
 type UpdateProfileInput struct {
 	Username *string `json:"username"`
 	Photo    *string `json:"photo"`

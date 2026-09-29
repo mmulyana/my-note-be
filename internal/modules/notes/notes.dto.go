@@ -76,3 +76,9 @@ type LinkUpdate struct {
 	ID     string                     `json:"id"`
 	Fields map[string]json.RawMessage `json:"fields"`
 }
+
+// MoveNoteInput: the notes that sit directly above (PrevID) and below (NextID) the dropped note; at least one is required
+type MoveNoteInput struct {
+	PrevID *string `json:"prevId"`
+	NextID *string `json:"nextId"`
+}

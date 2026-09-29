@@ -32,6 +32,7 @@ type Note struct {
 	Archived  bool       `gorm:"not null;default:false" json:"archived"`
 	Pinned    bool       `gorm:"not null;default:false" json:"pinned"`
 	Secret    bool       `gorm:"not null;default:false" json:"secret"`
+	Position  float64    `gorm:"not null;default:0" json:"-"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 

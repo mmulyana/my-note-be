@@ -3,6 +3,7 @@ package notes
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -110,15 +111,15 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 	} else if lastID != "" {
 		// note: keyset from the last note the client holds; unknown lastID matches nothing
 		dataQ = dataQ.Where(
-			"(notes.created_at, notes.id) < (SELECT c.created_at, c.id FROM notes c WHERE c.id = ? AND c.user_id = ?)",
+			"(notes.position, notes.id) > (SELECT c.position, c.id FROM notes c WHERE c.id = ? AND c.user_id = ?)",
 			lastID, userID,
 		)
 	}
 
 	var notes []Note
 	err := dataQ.
-		Order("notes.created_at DESC").
-		Order("notes.id DESC").
+		Order("notes.position ASC").
+		Order("notes.id ASC").
 		Limit(limit).
 		Find(&notes).Error
 
@@ -179,6 +180,8 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 		Content:  in.Content,
 		Title:    extractTitle(in.Content),
 		FolderID: in.FolderID,
+		// note: negative epoch ms so new notes sort first (position ASC), matching the backfill in migration 23
+		Position: -float64(time.Now().UnixMilli()),
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -545,4 +548,52 @@ func extractTitle(content string) string {
 		return ""
 	}
 	return strings.TrimSpace(tagRe.ReplaceAllString(m[1], ""))
+}
+
+var ErrInvalidMove = errors.New("prevId or nextId required and must be other notes")
+
+func (s *Service) neighborPosition(userID uuid.UUID, id string) (float64, error) {
+	var n Note
+	if err := s.db.Select("position").First(&n, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return 0, err
+	}
+	return n.Position, nil
+}
+
+// Move re-slots one note between two neighbors (fractional indexing), so a reorder is a single-row update.
+func (s *Service) Move(id string, userID uuid.UUID, in MoveNoteInput) error {
+	if (in.PrevID == nil && in.NextID == nil) || (in.PrevID != nil && *in.PrevID == id) || (in.NextID != nil && *in.NextID == id) {
+		return ErrInvalidMove
+	}
+	if err := s.db.Select("id").First(&Note{}, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return err
+	}
+
+	var pos float64
+	switch {
+	case in.PrevID != nil && in.NextID != nil:
+		prev, err := s.neighborPosition(userID, *in.PrevID)
+		if err != nil {
+			return err
+		}
+		next, err := s.neighborPosition(userID, *in.NextID)
+		if err != nil {
+			return err
+		}
+		pos = (prev + next) / 2
+	case in.PrevID != nil:
+		prev, err := s.neighborPosition(userID, *in.PrevID)
+		if err != nil {
+			return err
+		}
+		pos = prev + 1
+	default:
+		next, err := s.neighborPosition(userID, *in.NextID)
+		if err != nil {
+			return err
+		}
+		pos = next - 1
+	}
+
+	return s.db.Exec("UPDATE notes SET position = ? WHERE id = ? AND user_id = ?", pos, id, userID).Error
 }

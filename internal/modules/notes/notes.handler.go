@@ -266,3 +266,27 @@ func respondLookupError(c *gin.Context, err error) {
 	}
 	response.Error(c, http.StatusInternalServerError, err.Error())
 }
+
+func (h *Handler) Move(c *gin.Context) {
+	id := c.Param("id")
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	var in MoveNoteInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.Move(id, uid, in); err != nil {
+		if errors.Is(err, ErrInvalidMove) {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		respondLookupError(c, err)
+		return
+	}
+	response.OK(c, "moved", gin.H{"id": id})
+}

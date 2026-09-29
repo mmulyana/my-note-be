@@ -15,6 +15,7 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 		g.GET("/:id", h.FindOne)
 		g.POST("", h.Create)
 		g.PATCH("/:id", h.Save)
+		g.PATCH("/:id/position", h.Move)
 		g.DELETE("/:id", h.Remove)
 	}
 }

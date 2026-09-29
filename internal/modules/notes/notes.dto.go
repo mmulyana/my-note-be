@@ -82,3 +82,10 @@ type MoveNoteInput struct {
 	PrevID *string `json:"prevId"`
 	NextID *string `json:"nextId"`
 }
+
+// FlagsNoteInput: flag-only update, so list actions do not have to resend the note content
+type FlagsNoteInput struct {
+	Pinned   *bool `json:"pinned"`
+	Archived *bool `json:"archived"`
+	Secret   *bool `json:"secret"`
+}

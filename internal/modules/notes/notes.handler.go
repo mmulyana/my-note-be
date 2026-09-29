@@ -290,3 +290,27 @@ func (h *Handler) Move(c *gin.Context) {
 	}
 	response.OK(c, "moved", gin.H{"id": id})
 }
+
+func (h *Handler) SetFlags(c *gin.Context) {
+	id := c.Param("id")
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	var in FlagsNoteInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.SetFlags(id, uid, in); err != nil {
+		if errors.Is(err, ErrInvalidMove) {
+			response.Error(c, http.StatusBadRequest, "no flags to update")
+			return
+		}
+		respondLookupError(c, err)
+		return
+	}
+	response.OK(c, "updated", gin.H{"id": id})
+}

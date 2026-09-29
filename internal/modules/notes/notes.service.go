@@ -597,3 +597,28 @@ func (s *Service) Move(id string, userID uuid.UUID, in MoveNoteInput) error {
 
 	return s.db.Exec("UPDATE notes SET position = ? WHERE id = ? AND user_id = ?", pos, id, userID).Error
 }
+
+// SetFlags updates only pinned/archived/secret; content, preview, folder and labels stay untouched.
+func (s *Service) SetFlags(id string, userID uuid.UUID, in FlagsNoteInput) error {
+	updates := map[string]any{}
+	if in.Pinned != nil {
+		updates["pinned"] = *in.Pinned
+	}
+	if in.Archived != nil {
+		updates["archived"] = *in.Archived
+	}
+	if in.Secret != nil {
+		updates["secret"] = *in.Secret
+	}
+	if len(updates) == 0 {
+		return ErrInvalidMove
+	}
+	res := s.db.Model(&Note{}).Where("id = ? AND user_id = ?", id, userID).Updates(updates)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}

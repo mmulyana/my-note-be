@@ -31,6 +31,8 @@ type NoteListItemResponse struct {
 	ID          string          `json:"id"`
 	Title       string          `json:"title"`
 	Preview     string          `json:"preview"`
+	Cover       string          `json:"cover"`
+	CoverStyle  string          `json:"coverStyle"`
 	TodoSummary TodoSummary     `json:"todoSummary"`
 	Todos       []TodoResponse  `json:"todos,omitempty"`
 	Labels      []LabelResponse `json:"labels"`
@@ -59,9 +61,11 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 		}
 	}
 	return NoteListItemResponse{
-		ID:      n.ID,
-		Title:   n.Title,
-		Preview: n.Preview,
+		ID:         n.ID,
+		Title:      n.Title,
+		Preview:    n.Preview,
+		Cover:      n.Cover,
+		CoverStyle: n.CoverStyle,
 		TodoSummary: TodoSummary{
 			Total: n.TodoTotal,
 			Done:  n.TodoDone,
@@ -85,18 +89,19 @@ func ToListItemResponses(notes []Note) []NoteListItemResponse {
 }
 
 type NoteDetailResponse struct {
-	ID        string          `json:"id"`
-	Title     string          `json:"title"`
-	Content   string          `json:"content"`
-	FolderID  *uuid.UUID      `json:"folderId"`
-	Folder    *FolderResponse `json:"folder"`
-	Todos     []TodoResponse  `json:"todos"`
-	Labels    []LabelResponse `json:"labels"`
-	Pinned    bool            `json:"pinned"`
-	Secret    bool            `json:"secret"`
-	Archived  bool            `json:"archived"`
-	CreatedAt time.Time       `json:"createdAt"`
-	UpdatedAt time.Time       `json:"updatedAt"`
+	ID         string          `json:"id"`
+	Title      string          `json:"title"`
+	Content    string          `json:"content"`
+	FolderID   *uuid.UUID      `json:"folderId"`
+	Folder     *FolderResponse `json:"folder"`
+	Todos      []TodoResponse  `json:"todos"`
+	Labels     []LabelResponse `json:"labels"`
+	Pinned     bool            `json:"pinned"`
+	Secret     bool            `json:"secret"`
+	Archived   bool            `json:"archived"`
+	CoverStyle string          `json:"coverStyle"`
+	CreatedAt  time.Time       `json:"createdAt"`
+	UpdatedAt  time.Time       `json:"updatedAt"`
 }
 
 type TodoResponse struct {
@@ -118,18 +123,19 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 		lbls[i] = LabelResponse{ID: l.ID, Name: l.Name}
 	}
 	return NoteDetailResponse{
-		ID:        n.ID,
-		Title:     n.Title,
-		Content:   n.Content,
-		FolderID:  n.FolderID,
-		Folder:    toFolderResponse(n.Folder),
-		Todos:     todos,
-		Labels:    lbls,
-		Pinned:    n.Pinned,
-		Secret:    n.Secret,
-		Archived:  n.Archived,
-		CreatedAt: n.CreatedAt,
-		UpdatedAt: n.UpdatedAt,
+		ID:         n.ID,
+		Title:      n.Title,
+		Content:    n.Content,
+		FolderID:   n.FolderID,
+		Folder:     toFolderResponse(n.Folder),
+		Todos:      todos,
+		Labels:     lbls,
+		Pinned:     n.Pinned,
+		Secret:     n.Secret,
+		Archived:   n.Archived,
+		CoverStyle: n.CoverStyle,
+		CreatedAt:  n.CreatedAt,
+		UpdatedAt:  n.UpdatedAt,
 	}
 }
 

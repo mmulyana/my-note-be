@@ -7,24 +7,27 @@ import (
 )
 
 type CreateNoteInput struct {
-	ID       string     `json:"id" binding:"required"`
-	Content  string     `json:"content"`
-	TodoDiff TodoDiff   `json:"todoDiff"`
-	LinkDiff LinkDiff   `json:"linkDiff"`
-	Labels   []string   `json:"labels"`
-	FolderID *uuid.UUID `json:"folderId"`
+	ID             string         `json:"id" binding:"required"`
+	Content        string         `json:"content"`
+	TodoDiff       TodoDiff       `json:"todoDiff"`
+	LinkDiff       LinkDiff       `json:"linkDiff"`
+	AttachmentDiff AttachmentDiff `json:"attachmentDiff"`
+	Labels         []string       `json:"labels"`
+	FolderID       *uuid.UUID     `json:"folderId"`
 }
 
 type SaveNoteInput struct {
-	Content  string     `json:"content" binding:"required"`
-	Preview  string     `json:"preview"`
-	TodoDiff TodoDiff   `json:"todoDiff"`
-	LinkDiff LinkDiff   `json:"linkDiff"`
-	Labels   []string   `json:"labels"`
-	FolderID *uuid.UUID `json:"folderId"`
-	Pinned   *bool      `json:"pinned"`
-	Archived *bool      `json:"archived"`
-	Secret   *bool      `json:"secret"`
+	Content        string         `json:"content" binding:"required"`
+	Preview        string         `json:"preview"`
+	TodoDiff       TodoDiff       `json:"todoDiff"`
+	LinkDiff       LinkDiff       `json:"linkDiff"`
+	AttachmentDiff AttachmentDiff `json:"attachmentDiff"`
+	Labels         []string       `json:"labels"`
+	FolderID       *uuid.UUID     `json:"folderId"`
+	Pinned         *bool          `json:"pinned"`
+	Archived       *bool          `json:"archived"`
+	Secret         *bool          `json:"secret"`
+	CoverStyle     *string        `json:"coverStyle"`
 }
 
 type CountsResponse struct {
@@ -77,6 +80,23 @@ type LinkUpdate struct {
 	Fields map[string]json.RawMessage `json:"fields"`
 }
 
+type AttachmentDiff struct {
+	Added   []AttachmentInput `json:"added"`
+	Removed []string          `json:"removed"`
+	// note: cover kosong = nggak berubah, null = tanpa thumbnail, string = id attachment thumbnail
+	Cover json.RawMessage `json:"cover"`
+}
+
+type AttachmentInput struct {
+	ID        string `json:"id"`
+	Path      string `json:"path"`
+	ThumbPath string `json:"thumbPath"`
+	Mime      string `json:"mime"`
+	Size      int64  `json:"size"`
+	Width     int    `json:"width"`
+	Height    int    `json:"height"`
+}
+
 // MoveNoteInput: the notes that sit directly above (PrevID) and below (NextID) the dropped note; at least one is required
 type MoveNoteInput struct {
 	PrevID *string `json:"prevId"`
@@ -85,7 +105,8 @@ type MoveNoteInput struct {
 
 // FlagsNoteInput: flag-only update, so list actions do not have to resend the note content
 type FlagsNoteInput struct {
-	Pinned   *bool `json:"pinned"`
-	Archived *bool `json:"archived"`
-	Secret   *bool `json:"secret"`
+	Pinned     *bool   `json:"pinned"`
+	Archived   *bool   `json:"archived"`
+	Secret     *bool   `json:"secret"`
+	CoverStyle *string `json:"coverStyle"`
 }

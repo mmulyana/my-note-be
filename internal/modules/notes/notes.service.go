@@ -91,7 +91,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 	}
 
 	dataQ := s.db.
-		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at").
+		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at, notes.cover_style, "+coverSQL).
 		Preload("Labels").
 		Preload("Folder").
 		Where("notes.user_id = ?", userID).
@@ -238,6 +238,9 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 		if err := applyLinkDiff(tx, note.ID, in.LinkDiff); err != nil {
 			return err
 		}
+		if err := applyAttachmentDiff(tx, note.ID, in.AttachmentDiff); err != nil {
+			return err
+		}
 
 		return tx.Exec(`
 			UPDATE notes SET
@@ -274,6 +277,9 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 		}
 		if in.Secret != nil {
 			noteUpdates["secret"] = *in.Secret
+		}
+		if in.CoverStyle != nil && validCoverStyles[*in.CoverStyle] {
+			noteUpdates["cover_style"] = *in.CoverStyle
 		}
 		if err := tx.Model(&Note{}).Where("id = ?", id).Updates(noteUpdates).Error; err != nil {
 			return err
@@ -326,6 +332,9 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 		}
 
 		if err := applyLinkDiff(tx, id, in.LinkDiff); err != nil {
+			return err
+		}
+		if err := applyAttachmentDiff(tx, id, in.AttachmentDiff); err != nil {
 			return err
 		}
 
@@ -452,6 +461,61 @@ func applyLinkDiff(tx *gorm.DB, noteID string, diff LinkDiff) error {
 	}
 
 	return nil
+}
+
+// note: hanya path hasil /uploads notes yang boleh jadi attachment, biar client nggak bisa nyimpen path sembarang
+var attachmentPathRe = regexp.MustCompile(`^/uploads/notes/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$`)
+
+// note: full = gambar utuh + judul, banner = potongan + judul, overlay = judul di atas gambar
+var validCoverStyles = map[string]bool{"full": true, "banner": true, "overlay": true}
+
+const coverSQL = "COALESCE((SELECT a.thumb_path FROM attachments a WHERE a.note_id = notes.id AND a.is_cover LIMIT 1), '') AS cover"
+
+func applyAttachmentDiff(tx *gorm.DB, noteID string, diff AttachmentDiff) error {
+	if len(diff.Removed) > 0 {
+		if err := tx.Where("id IN ? AND note_id = ?", diff.Removed, noteID).
+			Delete(&Attachment{}).Error; err != nil {
+			return err
+		}
+	}
+
+	for _, a := range diff.Added {
+		if a.ID == "" || !attachmentPathRe.MatchString(a.Path) {
+			continue
+		}
+		thumb := a.ThumbPath
+		if !attachmentPathRe.MatchString(thumb) {
+			thumb = ""
+		}
+		att := Attachment{
+			ID:        a.ID,
+			NoteID:    noteID,
+			Path:      a.Path,
+			ThumbPath: thumb,
+			Mime:      a.Mime,
+			Size:      a.Size,
+			Width:     a.Width,
+			Height:    a.Height,
+		}
+		// note: autosave bisa ngirim id yang sama dua kali
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&att).Error; err != nil {
+			return err
+		}
+	}
+
+	if len(diff.Cover) == 0 {
+		return nil
+	}
+	if err := tx.Model(&Attachment{}).Where("note_id = ?", noteID).Update("is_cover", false).Error; err != nil {
+		return err
+	}
+	var coverID *string
+	if err := json.Unmarshal(diff.Cover, &coverID); err != nil || coverID == nil {
+		return nil
+	}
+	return tx.Model(&Attachment{}).
+		Where("id = ? AND note_id = ? AND thumb_path <> ''", *coverID, noteID).
+		Update("is_cover", true).Error
 }
 
 var linkColumns = map[string]string{
@@ -609,6 +673,9 @@ func (s *Service) SetFlags(id string, userID uuid.UUID, in FlagsNoteInput) error
 	}
 	if in.Secret != nil {
 		updates["secret"] = *in.Secret
+	}
+	if in.CoverStyle != nil && validCoverStyles[*in.CoverStyle] {
+		updates["cover_style"] = *in.CoverStyle
 	}
 	if len(updates) == 0 {
 		return ErrInvalidMove

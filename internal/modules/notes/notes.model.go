@@ -20,26 +20,29 @@ const (
 )
 
 type Note struct {
-	ID        string     `gorm:"type:text;primaryKey" json:"id"`
-	UserID    uuid.UUID  `gorm:"type:uuid;not null" json:"userId"`
-	FolderID  *uuid.UUID `gorm:"type:uuid;null" json:"folderId"`
-	Title     string     `gorm:"size:200;not null;default:''" json:"title"`
-	Preview   string     `gorm:"type:text;not null;default:''" json:"preview"`
-	Text      string     `gorm:"type:text;not null;default:''" json:"-"`
-	Content   string     `gorm:"type:text;not null;default:''" json:"content"`
-	TodoTotal int        `gorm:"column:todo_total;not null;default:0" json:"todoTotal"`
-	TodoDone  int        `gorm:"column:todo_done;not null;default:0" json:"todoDone"`
-	Archived  bool       `gorm:"not null;default:false" json:"archived"`
-	Pinned    bool       `gorm:"not null;default:false" json:"pinned"`
-	Secret    bool       `gorm:"not null;default:false" json:"secret"`
-	Position  float64    `gorm:"not null;default:0" json:"-"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
+	ID         string     `gorm:"type:text;primaryKey" json:"id"`
+	UserID     uuid.UUID  `gorm:"type:uuid;not null" json:"userId"`
+	FolderID   *uuid.UUID `gorm:"type:uuid;null" json:"folderId"`
+	Title      string     `gorm:"size:200;not null;default:''" json:"title"`
+	Preview    string     `gorm:"type:text;not null;default:''" json:"preview"`
+	Text       string     `gorm:"type:text;not null;default:''" json:"-"`
+	Content    string     `gorm:"type:text;not null;default:''" json:"content"`
+	TodoTotal  int        `gorm:"column:todo_total;not null;default:0" json:"todoTotal"`
+	TodoDone   int        `gorm:"column:todo_done;not null;default:0" json:"todoDone"`
+	Archived   bool       `gorm:"not null;default:false" json:"archived"`
+	Pinned     bool       `gorm:"not null;default:false" json:"pinned"`
+	Secret     bool       `gorm:"not null;default:false" json:"secret"`
+	Position   float64    `gorm:"not null;default:0" json:"-"`
+	Cover      string     `gorm:"->;-:migration" json:"-"`
+	CoverStyle string     `gorm:"column:cover_style;not null;default:'banner'" json:"-"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 
-	Todos  []Todo          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
-	Links  []Link          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
-	Labels []labels.Label  `gorm:"many2many:note_labels;" json:"-"`
-	Folder *folders.Folder `gorm:"foreignKey:FolderID;references:ID" json:"-"`
+	Todos       []Todo          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
+	Links       []Link          `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
+	Attachments []Attachment    `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
+	Labels      []labels.Label  `gorm:"many2many:note_labels;" json:"-"`
+	Folder      *folders.Folder `gorm:"foreignKey:FolderID;references:ID" json:"-"`
 }
 
 type Todo struct {
@@ -67,4 +70,18 @@ type Link struct {
 	SiteName    string    `gorm:"column:site_name;type:text;not null;default:''" json:"siteName"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// note: Attachment cuma buat gambar yang diupload, gambar URL eksternal nggak masuk sini
+type Attachment struct {
+	ID        string    `gorm:"type:text;primaryKey" json:"id"`
+	NoteID    string    `gorm:"type:text;not null;index" json:"noteId"`
+	Path      string    `gorm:"type:text;not null" json:"path"`
+	ThumbPath string    `gorm:"column:thumb_path;type:text;not null;default:''" json:"thumbPath"`
+	Mime      string    `gorm:"type:text;not null;default:''" json:"mime"`
+	Size      int64     `gorm:"not null;default:0" json:"size"`
+	Width     int       `gorm:"not null;default:0" json:"width"`
+	Height    int       `gorm:"not null;default:0" json:"height"`
+	IsCover   bool      `gorm:"column:is_cover;not null;default:false" json:"isCover"`
+	CreatedAt time.Time `json:"createdAt"`
 }

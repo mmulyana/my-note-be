@@ -20,7 +20,7 @@ func NewService(db *gorm.DB) *Service {
 
 func (s *Service) FindAll(userID uuid.UUID) ([]Folder, error) {
 	var folders []Folder
-	err := s.db.Where("user_id = ?", userID).Order("name").Find(&folders).Error
+	err := s.db.Where("user_id = ?", userID).Order("position, name").Find(&folders).Error
 	return folders, err
 }
 
@@ -34,6 +34,9 @@ func (s *Service) FindOne(id uuid.UUID, userID uuid.UUID) (*Folder, error) {
 
 func (s *Service) Create(userID uuid.UUID, in FolderInput) (*Folder, error) {
 	f := in.ToModel(userID)
+	if err := s.db.Model(&Folder{}).Where("user_id = ?", userID).Select("COALESCE(MAX(position), 0) + 1").Scan(&f.Position).Error; err != nil {
+		return nil, err
+	}
 	if err := s.db.Create(&f).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateName
@@ -72,6 +75,53 @@ func (s *Service) Remove(id uuid.UUID, userID uuid.UUID) error {
 	return nil
 }
 
+var ErrInvalidMove = errors.New("prevId or nextId required and must be other folders")
+
+func (s *Service) neighborPosition(userID uuid.UUID, id string) (float64, error) {
+	var f Folder
+	if err := s.db.Select("position").First(&f, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return 0, err
+	}
+	return f.Position, nil
+}
+
+func (s *Service) Move(id string, userID uuid.UUID, in MoveFolderInput) error {
+	if (in.PrevID == nil && in.NextID == nil) || (in.PrevID != nil && *in.PrevID == id) || (in.NextID != nil && *in.NextID == id) {
+		return ErrInvalidMove
+	}
+	if err := s.db.Select("id").First(&Folder{}, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return err
+	}
+
+	var pos float64
+	switch {
+	case in.PrevID != nil && in.NextID != nil:
+		prev, err := s.neighborPosition(userID, *in.PrevID)
+		if err != nil {
+			return err
+		}
+		next, err := s.neighborPosition(userID, *in.NextID)
+		if err != nil {
+			return err
+		}
+		pos = (prev + next) / 2
+	case in.PrevID != nil:
+		prev, err := s.neighborPosition(userID, *in.PrevID)
+		if err != nil {
+			return err
+		}
+		pos = prev + 1
+	default:
+		next, err := s.neighborPosition(userID, *in.NextID)
+		if err != nil {
+			return err
+		}
+		pos = next - 1
+	}
+
+	return s.db.Exec("UPDATE folders SET position = ? WHERE id = ? AND user_id = ?", pos, id, userID).Error
+}
+
 const maxNotesPerFolder = 3
 
 type FolderNote struct {
@@ -106,7 +156,7 @@ func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int, pinned *bo
 	var folders []Folder
 	offset := (page - 1) * limit
 	if err := q.
-		Order("name").
+		Order("position, name").
 		Offset(offset).
 		Limit(limit).
 		Find(&folders).Error; err != nil {

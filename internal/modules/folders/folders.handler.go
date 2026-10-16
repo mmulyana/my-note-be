@@ -127,6 +127,31 @@ func (h *Handler) Update(c *gin.Context) {
 	response.OK(c, "updated", ToResponse(*f))
 }
 
+func (h *Handler) Move(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+	var in MoveFolderInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.service.Move(id.String(), uid, in); err != nil {
+		if errors.Is(err, ErrInvalidMove) {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		respondLookupError(c, err)
+		return
+	}
+	response.OK(c, "moved", gin.H{"id": id})
+}
+
 func (h *Handler) Remove(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

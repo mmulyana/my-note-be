@@ -14,6 +14,11 @@ type FolderInput struct {
 	Isolated bool   `json:"isolated"`
 }
 
+type MoveFolderInput struct {
+	PrevID *string `json:"prevId"`
+	NextID *string `json:"nextId"`
+}
+
 type FolderUpdateInput struct {
 	Name     *string `json:"name"`
 	Color    *string `json:"color"`

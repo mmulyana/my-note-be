@@ -15,6 +15,7 @@ type Folder struct {
 	Secret    bool           `gorm:"not null;default:false" json:"secret"`
 	Pinned    bool           `gorm:"not null;default:false" json:"pinned"`
 	Isolated  bool           `gorm:"not null;default:false" json:"isolated"`
+	Position  float64        `gorm:"not null;default:0" json:"-"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

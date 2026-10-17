@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
 	"regexp"
 	"strings"
 	"time"
@@ -91,7 +92,7 @@ func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.U
 	}
 
 	dataQ := s.db.
-		Select("notes.id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at, notes.cover_style, "+coverSQL).
+		Select(listColumns).
 		Preload("Labels").
 		Preload("Folder").
 		Where("notes.user_id = ?", userID).
@@ -161,12 +162,23 @@ func (s *Service) Counts(userID uuid.UUID) (CountsResponse, error) {
 	return out, nil
 }
 
+func orderChildren(db *gorm.DB) *gorm.DB {
+	return db.
+		Select(listColumns).
+		Order("notes.position ASC").
+		Order("notes.id ASC")
+}
+
 func (s *Service) FindOne(id string, userID uuid.UUID) (*Note, error) {
 	var note Note
 	if err := s.db.
 		Preload("Todos", orderTodosByContent).
 		Preload("Labels").
 		Preload("Folder").
+		Preload("Parent", func(db *gorm.DB) *gorm.DB { return db.Select("id, title") }).
+		Preload("Children", orderChildren).
+		Preload("Children.Labels").
+		Preload("Children.Folder").
 		First(&note, "id = ? AND user_id = ?", id, userID).Error; err != nil {
 		return nil, err
 	}
@@ -182,6 +194,17 @@ func (s *Service) Create(userID uuid.UUID, in CreateNoteInput) (*Note, error) {
 		FolderID: in.FolderID,
 		// note: negative epoch ms so new notes sort first (position ASC), matching the backfill in migration 23
 		Position: -float64(time.Now().UnixMilli()),
+	}
+
+	if in.ParentID != nil {
+		parent, err := findParent(s.db, *in.ParentID, userID)
+		if err != nil {
+			return nil, err
+		}
+		note.ParentID = in.ParentID
+		note.FolderID = parent.FolderID
+		note.Archived = parent.Archived
+		note.Secret = parent.Secret
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -262,12 +285,21 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			return err
 		}
 
+		folderID := in.FolderID
+		if existing.ParentID != nil {
+			parent, err := findParent(tx, *existing.ParentID, userID)
+			if err != nil {
+				return err
+			}
+			folderID = parent.FolderID
+		}
+
 		noteUpdates := map[string]any{
 			"content":   in.Content,
 			"preview":   in.Preview,
 			"title":     extractTitle(in.Content),
 			"text":      tagRe.ReplaceAllString(in.Preview, ""),
-			"folder_id": in.FolderID,
+			"folder_id": folderID,
 		}
 		if in.Pinned != nil {
 			noteUpdates["pinned"] = *in.Pinned
@@ -282,6 +314,20 @@ func (s *Service) Save(id string, userID uuid.UUID, in SaveNoteInput) (*Note, er
 			noteUpdates["cover_style"] = *in.CoverStyle
 		}
 		if err := tx.Model(&Note{}).Where("id = ?", id).Updates(noteUpdates).Error; err != nil {
+			return err
+		}
+
+		inherited := map[string]any{}
+		if !sameUUID(existing.FolderID, folderID) {
+			inherited["folder_id"] = folderID
+		}
+		if in.Archived != nil && *in.Archived != existing.Archived {
+			inherited["archived"] = *in.Archived
+		}
+		if in.Secret != nil && *in.Secret != existing.Secret {
+			inherited["secret"] = *in.Secret
+		}
+		if err := cascadeToDescendants(tx, id, inherited); err != nil {
 			return err
 		}
 
@@ -470,6 +516,10 @@ var attachmentPathRe = regexp.MustCompile(`^/uploads/notes/[A-Za-z0-9_-]+\.(jpg|
 var validCoverStyles = map[string]bool{"full": true, "banner": true, "overlay": true}
 
 const coverSQL = "COALESCE((SELECT a.thumb_path FROM attachments a WHERE a.note_id = notes.id AND a.is_cover LIMIT 1), '') AS cover"
+
+const childCountSQL = "(SELECT COUNT(*) FROM notes c WHERE c.parent_id = notes.id) AS child_count"
+
+const listColumns = "notes.id, notes.parent_id, notes.title, notes.preview, notes.folder_id, notes.pinned, notes.secret, notes.archived, notes.todo_total, notes.todo_done, notes.updated_at, notes.cover_style, " + coverSQL + ", " + childCountSQL
 
 func applyAttachmentDiff(tx *gorm.DB, noteID string, diff AttachmentDiff) error {
 	if len(diff.Removed) > 0 {
@@ -680,12 +730,93 @@ func (s *Service) SetFlags(id string, userID uuid.UUID, in FlagsNoteInput) error
 	if len(updates) == 0 {
 		return ErrInvalidMove
 	}
-	res := s.db.Model(&Note{}).Where("id = ? AND user_id = ?", id, userID).Updates(updates)
-	if res.Error != nil {
-		return res.Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Note{}).Where("id = ? AND user_id = ?", id, userID).Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		inherited := map[string]any{}
+		if in.Archived != nil {
+			inherited["archived"] = *in.Archived
+		}
+		if in.Secret != nil {
+			inherited["secret"] = *in.Secret
+		}
+		return cascadeToDescendants(tx, id, inherited)
+	})
+}
+
+var ErrInvalidParent = errors.New("parent must be another note of the same user and not one of its own descendants")
+
+func (s *Service) SetParent(id string, userID uuid.UUID, parentID *string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Select("id").First(&Note{}, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+			return err
+		}
+		if parentID == nil {
+			return tx.Model(&Note{}).Where("id = ?", id).Update("parent_id", nil).Error
+		}
+		if *parentID == id {
+			return ErrInvalidParent
+		}
+
+		parent, err := findParent(tx, *parentID, userID)
+		if err != nil {
+			return err
+		}
+
+		var loop bool
+		if err := tx.Raw(
+			"SELECT EXISTS (WITH RECURSIVE d AS (SELECT id FROM notes WHERE parent_id = ? UNION SELECT n.id FROM notes n JOIN d ON n.parent_id = d.id) SELECT 1 FROM d WHERE id = ?)",
+			id, *parentID,
+		).Scan(&loop).Error; err != nil {
+			return err
+		}
+		if loop {
+			return ErrInvalidParent
+		}
+
+		inherited := map[string]any{
+			"folder_id": parent.FolderID,
+			"archived":  parent.Archived,
+			"secret":    parent.Secret,
+		}
+		own := map[string]any{"parent_id": *parentID}
+		maps.Copy(own, inherited)
+		if err := tx.Model(&Note{}).Where("id = ?", id).Updates(own).Error; err != nil {
+			return err
+		}
+		return cascadeToDescendants(tx, id, inherited)
+	})
+}
+
+func findParent(tx *gorm.DB, parentID string, userID uuid.UUID) (*Note, error) {
+	var parent Note
+	if err := tx.First(&parent, "id = ? AND user_id = ?", parentID, userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrInvalidParent
+		}
+		return nil, err
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+	return &parent, nil
+}
+
+func cascadeToDescendants(tx *gorm.DB, id string, updates map[string]any) error {
+	if len(updates) == 0 {
+		return nil
 	}
-	return nil
+	return tx.Model(&Note{}).
+		Where("id IN (WITH RECURSIVE d AS (SELECT id FROM notes WHERE parent_id = ? UNION SELECT n.id FROM notes n JOIN d ON n.parent_id = d.id) SELECT id FROM d)", id).
+		Updates(updates).Error
+}
+
+func sameUUID(a, b *uuid.UUID) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

@@ -218,6 +218,10 @@ func (h *Handler) Create(c *gin.Context) {
 
 	note, err := h.service.Create(uid, in)
 	if err != nil {
+		if errors.Is(err, ErrInvalidParent) {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -289,6 +293,30 @@ func (h *Handler) Move(c *gin.Context) {
 		return
 	}
 	response.OK(c, "moved", gin.H{"id": id})
+}
+
+func (h *Handler) SetParent(c *gin.Context) {
+	id := c.Param("id")
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	var in ParentNoteInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.SetParent(id, uid, in.ParentID); err != nil {
+		if errors.Is(err, ErrInvalidParent) {
+			response.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		respondLookupError(c, err)
+		return
+	}
+	response.OK(c, "updated", gin.H{"id": id})
 }
 
 func (h *Handler) SetFlags(c *gin.Context) {

@@ -17,6 +17,7 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 		g.PATCH("/:id", h.Save)
 		g.PATCH("/:id/position", h.Move)
 		g.PATCH("/:id/flags", h.SetFlags)
+		g.PATCH("/:id/parent", h.SetParent)
 		g.DELETE("/:id", h.Remove)
 	}
 }

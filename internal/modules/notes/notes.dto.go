@@ -14,6 +14,7 @@ type CreateNoteInput struct {
 	AttachmentDiff AttachmentDiff `json:"attachmentDiff"`
 	Labels         []string       `json:"labels"`
 	FolderID       *uuid.UUID     `json:"folderId"`
+	ParentID       *string        `json:"parentId"`
 }
 
 type SaveNoteInput struct {
@@ -101,6 +102,10 @@ type AttachmentInput struct {
 type MoveNoteInput struct {
 	PrevID *string `json:"prevId"`
 	NextID *string `json:"nextId"`
+}
+
+type ParentNoteInput struct {
+	ParentID *string `json:"parentId"`
 }
 
 // FlagsNoteInput: flag-only update, so list actions do not have to resend the note content

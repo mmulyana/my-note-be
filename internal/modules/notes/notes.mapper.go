@@ -29,6 +29,8 @@ func toFolderResponse(f *folders.Folder) *FolderResponse {
 
 type NoteListItemResponse struct {
 	ID          string          `json:"id"`
+	ParentID    *string         `json:"parentId"`
+	ChildCount  int             `json:"childCount"`
 	Title       string          `json:"title"`
 	Preview     string          `json:"preview"`
 	Cover       string          `json:"cover"`
@@ -62,6 +64,8 @@ func ToListItemResponse(n Note) NoteListItemResponse {
 	}
 	return NoteListItemResponse{
 		ID:         n.ID,
+		ParentID:   n.ParentID,
+		ChildCount: n.ChildCount,
 		Title:      n.Title,
 		Preview:    n.Preview,
 		Cover:      n.Cover,
@@ -88,20 +92,28 @@ func ToListItemResponses(notes []Note) []NoteListItemResponse {
 	return out
 }
 
+type NoteRefResponse struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
 type NoteDetailResponse struct {
-	ID         string          `json:"id"`
-	Title      string          `json:"title"`
-	Content    string          `json:"content"`
-	FolderID   *uuid.UUID      `json:"folderId"`
-	Folder     *FolderResponse `json:"folder"`
-	Todos      []TodoResponse  `json:"todos"`
-	Labels     []LabelResponse `json:"labels"`
-	Pinned     bool            `json:"pinned"`
-	Secret     bool            `json:"secret"`
-	Archived   bool            `json:"archived"`
-	CoverStyle string          `json:"coverStyle"`
-	CreatedAt  time.Time       `json:"createdAt"`
-	UpdatedAt  time.Time       `json:"updatedAt"`
+	ID         string                 `json:"id"`
+	ParentID   *string                `json:"parentId"`
+	Parent     *NoteRefResponse       `json:"parent"`
+	Children   []NoteListItemResponse `json:"children"`
+	Title      string                 `json:"title"`
+	Content    string                 `json:"content"`
+	FolderID   *uuid.UUID             `json:"folderId"`
+	Folder     *FolderResponse        `json:"folder"`
+	Todos      []TodoResponse         `json:"todos"`
+	Labels     []LabelResponse        `json:"labels"`
+	Pinned     bool                   `json:"pinned"`
+	Secret     bool                   `json:"secret"`
+	Archived   bool                   `json:"archived"`
+	CoverStyle string                 `json:"coverStyle"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	UpdatedAt  time.Time              `json:"updatedAt"`
 }
 
 type TodoResponse struct {
@@ -122,8 +134,15 @@ func ToDetailResponse(n Note) NoteDetailResponse {
 	for i, l := range n.Labels {
 		lbls[i] = LabelResponse{ID: l.ID, Name: l.Name}
 	}
+	var parent *NoteRefResponse
+	if n.Parent != nil {
+		parent = &NoteRefResponse{ID: n.Parent.ID, Title: n.Parent.Title}
+	}
 	return NoteDetailResponse{
 		ID:         n.ID,
+		ParentID:   n.ParentID,
+		Parent:     parent,
+		Children:   ToListItemResponses(n.Children),
 		Title:      n.Title,
 		Content:    n.Content,
 		FolderID:   n.FolderID,

@@ -23,6 +23,7 @@ type Note struct {
 	ID         string     `gorm:"type:text;primaryKey" json:"id"`
 	UserID     uuid.UUID  `gorm:"type:uuid;not null" json:"userId"`
 	FolderID   *uuid.UUID `gorm:"type:uuid;null" json:"folderId"`
+	ParentID   *string    `gorm:"type:text;null;index" json:"parentId"`
 	Title      string     `gorm:"size:200;not null;default:''" json:"title"`
 	Preview    string     `gorm:"type:text;not null;default:''" json:"preview"`
 	Text       string     `gorm:"type:text;not null;default:''" json:"-"`
@@ -35,6 +36,7 @@ type Note struct {
 	Position   float64    `gorm:"not null;default:0" json:"-"`
 	Cover      string     `gorm:"->;-:migration" json:"-"`
 	CoverStyle string     `gorm:"column:cover_style;not null;default:'banner'" json:"-"`
+	ChildCount int        `gorm:"->;-:migration" json:"-"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	UpdatedAt  time.Time  `json:"updatedAt"`
 
@@ -43,6 +45,8 @@ type Note struct {
 	Attachments []Attachment    `gorm:"foreignKey:NoteID;constraint:OnDelete:CASCADE" json:"-"`
 	Labels      []labels.Label  `gorm:"many2many:note_labels;" json:"-"`
 	Folder      *folders.Folder `gorm:"foreignKey:FolderID;references:ID" json:"-"`
+	Parent      *Note           `gorm:"foreignKey:ParentID;references:ID" json:"-"`
+	Children    []Note          `gorm:"foreignKey:ParentID;references:ID" json:"-"`
 }
 
 type Todo struct {

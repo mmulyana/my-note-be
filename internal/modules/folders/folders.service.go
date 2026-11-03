@@ -128,6 +128,7 @@ type FolderNote struct {
 	FolderID uuid.UUID `gorm:"column:folder_id"`
 	Title    string    `gorm:"column:title"`
 	Text     string    `gorm:"column:text"`
+	Preview  string    `gorm:"column:preview"`
 }
 
 type FolderNoteCount struct {
@@ -176,10 +177,10 @@ func (s *Service) FindAllWithNotes(userID uuid.UUID, page, limit int, pinned *bo
 
 	var rows []FolderNote
 	if err := s.db.Raw(`
-		SELECT f.id AS folder_id, n.title, n.text
+		SELECT f.id AS folder_id, n.title, n.text, n.preview
 		FROM folders f
 		CROSS JOIN LATERAL (
-			SELECT title, text
+			SELECT title, text, preview
 			FROM notes
 			WHERE notes.folder_id = f.id AND notes.user_id = ? AND notes.archived = false
 			LIMIT ?

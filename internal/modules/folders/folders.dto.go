@@ -92,8 +92,9 @@ func ToResponses(folders []Folder) []FolderResponse {
 }
 
 type FolderNoteResponse struct {
-	Title string `json:"title"`
-	Text  string `json:"text"`
+	Title   string `json:"title"`
+	Text    string `json:"text"`
+	Preview string `json:"preview"`
 }
 
 type FolderWithNotesResponse struct {
@@ -105,7 +106,7 @@ type FolderWithNotesResponse struct {
 func ToWithNotesResponse(f Folder, notes []FolderNote, totalNotes int64) FolderWithNotesResponse {
 	out := make([]FolderNoteResponse, len(notes))
 	for i, n := range notes {
-		out[i] = FolderNoteResponse{Title: n.Title, Text: n.Text}
+		out[i] = FolderNoteResponse{Title: n.Title, Text: n.Text, Preview: n.Preview}
 	}
 	return FolderWithNotesResponse{FolderResponse: ToResponse(f), Notes: out, TotalNotes: totalNotes}
 }

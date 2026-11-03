@@ -820,3 +820,35 @@ func sameUUID(a, b *uuid.UUID) bool {
 	}
 	return *a == *b
 }
+
+func (s *Service) SetFolder(userID uuid.UUID, in SetFolderInput) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if in.FolderID != nil {
+			var count int64
+			if err := tx.Table("folders").Where("id = ? AND user_id = ?", *in.FolderID, userID).Count(&count).Error; err != nil {
+				return err
+			}
+			if count == 0 {
+				return gorm.ErrRecordNotFound
+			}
+		}
+
+		var roots []string
+		if err := tx.Model(&Note{}).
+			Where("id IN ? AND user_id = ? AND parent_id IS NULL", in.IDs, userID).
+			Pluck("id", &roots).Error; err != nil {
+			return err
+		}
+
+		updates := map[string]any{"folder_id": in.FolderID}
+		for _, id := range roots {
+			if err := tx.Model(&Note{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+				return err
+			}
+			if err := cascadeToDescendants(tx, id, updates); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

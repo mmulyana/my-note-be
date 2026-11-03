@@ -115,3 +115,8 @@ type FlagsNoteInput struct {
 	Secret     *bool   `json:"secret"`
 	CoverStyle *string `json:"coverStyle"`
 }
+
+type SetFolderInput struct {
+	IDs      []string   `json:"ids" binding:"required,min=1"`
+	FolderID *uuid.UUID `json:"folderId"`
+}

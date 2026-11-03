@@ -342,3 +342,22 @@ func (h *Handler) SetFlags(c *gin.Context) {
 	}
 	response.OK(c, "updated", gin.H{"id": id})
 }
+
+func (h *Handler) SetFolder(c *gin.Context) {
+	uid, ok := helpers.ParseUserID(c)
+	if !ok {
+		return
+	}
+
+	var in SetFolderInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.service.SetFolder(uid, in); err != nil {
+		respondLookupError(c, err)
+		return
+	}
+	response.OK(c, "updated", gin.H{"ids": in.IDs})
+}

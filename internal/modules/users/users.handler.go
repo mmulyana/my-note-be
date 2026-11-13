@@ -15,13 +15,30 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service     *Service
+	adminEmails map[string]struct{}
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{
-		service: NewService(db),
+func NewHandler(db *gorm.DB, adminEmails []string) *Handler {
+	set := make(map[string]struct{}, len(adminEmails))
+	for _, email := range adminEmails {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email != "" {
+			set[email] = struct{}{}
+		}
 	}
+	return &Handler{
+		service:     NewService(db),
+		adminEmails: set,
+	}
+}
+
+func (h *Handler) profile(u *User) ProfileResponse {
+	p := ToProfileResponse(u)
+	if u.Email != nil {
+		_, p.IsAdmin = h.adminEmails[strings.ToLower(*u.Email)]
+	}
+	return p
 }
 
 func (h *Handler) Register(c *gin.Context) {
@@ -94,7 +111,7 @@ func (h *Handler) UpgradeGuest(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, "upgraded", ToProfileResponse(user))
+	response.OK(c, "upgraded", h.profile(user))
 }
 
 func (h *Handler) Login(c *gin.Context) {
@@ -169,7 +186,7 @@ func (h *Handler) Me(c *gin.Context) {
 		response.Error(c, http.StatusNotFound, "user not found")
 		return
 	}
-	response.OK(c, "ok", ToProfileResponse(user))
+	response.OK(c, "ok", h.profile(user))
 }
 
 func (h *Handler) UpdateProfile(c *gin.Context) {
@@ -197,7 +214,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		os.Remove(strings.TrimPrefix(*existing.Photo, "/"))
 	}
 
-	response.OK(c, "updated", ToProfileResponse(updated))
+	response.OK(c, "updated", h.profile(updated))
 }
 
 func (h *Handler) ChangePassword(c *gin.Context) {

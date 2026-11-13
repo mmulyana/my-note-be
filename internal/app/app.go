@@ -43,7 +43,7 @@ func Run() {
 
 	protected := api.Group("")
 	protected.Use(middleware.AuthMiddleware())
-	users.RegisterProtectedRoutes(protected, db)
+	users.RegisterProtectedRoutes(protected, db, cfg.AdminEmails)
 	notes.RegisterRoutes(protected, db)
 	folders.RegisterRoutes(protected, db)
 	labels.RegisterRoutes(protected, db)

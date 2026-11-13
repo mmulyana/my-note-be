@@ -38,4 +38,5 @@ type ProfileResponse struct {
 	Username *string `json:"username"`
 	Photo    *string `json:"photo"`
 	IsGuest  bool    `json:"isGuest"`
+	IsAdmin  bool    `json:"isAdmin"`
 }

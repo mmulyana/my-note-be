@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
-	h := NewHandler(db)
+	h := NewHandler(db, nil)
 
 	g := r.Group("/auth")
 	{
@@ -18,8 +18,8 @@ func RegisterRoutes(r *gin.RouterGroup, db *gorm.DB) {
 	}
 }
 
-func RegisterProtectedRoutes(r *gin.RouterGroup, db *gorm.DB) {
-	h := NewHandler(db)
+func RegisterProtectedRoutes(r *gin.RouterGroup, db *gorm.DB, adminEmails []string) {
+	h := NewHandler(db, adminEmails)
 	r.GET("/me", h.Me)
 	r.PATCH("/me", h.UpdateProfile)
 	r.PATCH("/me/password", h.ChangePassword)

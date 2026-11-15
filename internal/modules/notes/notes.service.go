@@ -34,10 +34,13 @@ func orderTodosByContent(db *gorm.DB) *gorm.DB {
 		Order("todos.id ASC")
 }
 
-func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, tf TodoFilter, search string, lastID string, limit int) ([]Note, error) {
+func (s *Service) FindAll(userID uuid.UUID, labelID *uuid.UUID, folderID *uuid.UUID, hasFolder *bool, archived *bool, pinned *bool, hasTodo *bool, includeChildren bool, tf TodoFilter, search string, lastID string, limit int) ([]Note, error) {
 	search = strings.TrimSpace(search)
 
 	filters := func(db *gorm.DB) *gorm.DB {
+		if !includeChildren {
+			db = db.Where("notes.parent_id IS NULL")
+		}
 		if labelID != nil {
 			db = db.Joins("JOIN note_labels nl ON nl.note_id = notes.id").
 				Where("nl.label_id = ?", *labelID)

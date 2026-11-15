@@ -81,6 +81,13 @@ func (h *Handler) FindAll(c *gin.Context) {
 		}
 	}
 
+	includeChildren := false
+	if raw := c.Query("includeChildren"); raw != "" {
+		if v, err := strconv.ParseBool(raw); err == nil {
+			includeChildren = v
+		}
+	}
+
 	limit := 50
 	if raw := c.Query("limit"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
@@ -100,7 +107,7 @@ func (h *Handler) FindAll(c *gin.Context) {
 	}
 
 	// note: cursor = id of the last note the client already has; client stops when a page returns < limit
-	notes, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, tf, search, c.Query("lastId"), limit)
+	notes, err := h.service.FindAll(uid, labelID, folderID, hasFolder, archived, pinned, hasTodo, includeChildren, tf, search, c.Query("lastId"), limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
